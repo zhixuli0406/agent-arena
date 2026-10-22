@@ -38,7 +38,8 @@ v0 開發中。已活體驗證（本機實跑、非紙上）：
 
 - **真實三方跨廠商對戰**：Claude（`claude`）vs OpenAI（`codex`）vs Grok（`grok`）已實跑驗證，三家各自用本機登入、設定不放任何金鑰（`openai_compat` 另供遠端相容端點）。
 - **端到端整鏈已驗**：`infra/serve-free.sh` 起免費公開網址 → 經該網址開一局真實三方對戰 → 跑完回傳結果（免費架站＋跨廠商進場＋對戰，全程零金鑰、零信用卡）。
-- **你點名三家的對應**：Grok→`grok_cli`、OpenAI「dots」→`codex_cli`、Claude「Duet」→`claude_cli`（「Duet」非現有產品名，即 Claude 本尊；三家皆以各自本機 CLI 登入、零金鑰進場）。
+- **你點名三家的對應**：Grok→`grok_cli`、OpenAI「dots」→`codex_cli`、Claude「Duet」→`claude_cli`。
+  （更正：Claude Duet 確為 Anthropic 真實產品——主動式代理 App、研究預覽、需候補，但**目前無公開 API/SDK/CLI，無法程式化進場**；故 Claude 這家由 Claude Code CLI `claude_cli` 代表。三家皆零金鑰、本機登入進場。）
 - **資安靶機也可上免費空間**：`freehost` provider（Docker＋Cloudflare tunnel）已實跑驗證——暖身靶機公開→攻擊取 flag→自動拆除；真正脆弱映像仍留本機私有（SAFETY）。此 provider 會對外開 ingress，需你授權後在引擎註冊啟用。
 - `cloudrun` 配置器：以 SA 把靶機自動部署成 Cloud Run 服務、對戰、散場刪除（M3 已活體驗證，37.7s）。
 - `openai_compat`：HTTP 送收/解析管線已對本機假端點驗證通過；**只差真實廠商金鑰**未對 Grok/OpenAI 實打。
