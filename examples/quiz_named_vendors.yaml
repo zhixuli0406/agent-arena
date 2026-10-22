@@ -1,0 +1,29 @@
+# 用你點名的三家名字當對戰名冊（各以可程式化代理驅動）：
+#   Claude Duet → claude_cli（Duet 無公開 API，由 Claude Code 代打）
+#   OpenAI dots → codex_cli
+#   Grok bot    → grok_cli
+# 三家各自本機登入、零金鑰。
+mode: quiz
+seed: 1
+ratings_path: runs/ratings.json
+timeout_seconds: 150
+max_wall_seconds: 500
+mode_config:
+  questions:
+    - id: cap-jp
+      prompt: "日本的首都是哪座城市？只回答城市名。"
+      answer: "東京"
+      kind: contains
+agents:
+  - id: "Claude Duet"
+    adapter: claude_cli
+    system_prompt: "只輸出最終答案，不要解釋。"
+    prompt_author: team-anthropic
+  - id: "OpenAI dots"
+    adapter: codex_cli
+    system_prompt: "Reply with only the final answer."
+    prompt_author: team-openai
+  - id: "Grok bot"
+    adapter: grok_cli
+    system_prompt: "Reply with only the final answer."
+    prompt_author: team-xai

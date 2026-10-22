@@ -296,10 +296,10 @@ const MODES={
   ctf:{t:"資安攻防",d:"攻破隔離靶機、交出 flag（需 docker）",cfg:()=>({provider:"local",target:"arena-warmup",flag:"FLAG{warmup_recon_ok}",first_blood:true})},
 };
 const PRESETS={
-  three:{t:"三強爭霸",d:"Claude vs OpenAI vs Grok（本機 CLI，零金鑰）",a:[
-    {id:"Claude",adapter:"claude_cli",prompt_author:"you"},
-    {id:"OpenAI",adapter:"codex_cli",prompt_author:"you"},
-    {id:"Grok",adapter:"grok_cli",prompt_author:"you"}]},
+  three:{t:"三強爭霸",d:"你點名的三家：Claude Duet / OpenAI dots / Grok bot（各以可程式化代理驅動；Duet 無公開 API，由 Claude Code 代打）",a:[
+    {id:"Claude Duet",adapter:"claude_cli",prompt_author:"you"},
+    {id:"OpenAI dots",adapter:"codex_cli",prompt_author:"you"},
+    {id:"Grok bot",adapter:"grok_cli",prompt_author:"you"}]},
   duo:{t:"雙雄對決",d:"Claude vs OpenAI",a:[
     {id:"Claude",adapter:"claude_cli",prompt_author:"you"},
     {id:"OpenAI",adapter:"codex_cli",prompt_author:"you"}]},
