@@ -1,0 +1,72 @@
+name: Arena free-cloud server
+
+# 在 GitHub 免費雲端 runner 上自動架設對戰伺服器：
+# 起 uvicorn + Cloudflare quick tunnel 取得公開網址，自動開一局，網址印在 job summary。
+# 零帳號、零信用卡、不佔本機。手動從 Actions 分頁按 "Run workflow"，或用 API 觸發（開賽即架站）。
+#
+# 想在雲端跑「真實跨廠商」：把金鑰設成 repo secrets（Settings → Secrets → Actions）：
+#   ARENA_OPENAI_BASE_URL（如 https://api.x.ai/v1）、ARENA_OPENAI_API_KEY
+# 未設則用離線 demo（mock）代理。各家原生 CLI（claude/codex/grok）在 runner 上無登入，故雲端走 openai_compat。
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "伺服器保持上線的分鐘數"
+        default: "20"
+      mode:
+        description: "對戰類型 quiz 或 task"
+        default: "quiz"
+
+jobs:
+  serve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: pip install -e ".[server]"
+      - name: Install cloudflared
+        run: |
+          curl -fsSL -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x cloudflared
+      - name: Serve + tunnel + auto-match
+        env:
+          ARENA_OPENAI_BASE_URL: ${{ secrets.ARENA_OPENAI_BASE_URL }}
+          ARENA_OPENAI_API_KEY: ${{ secrets.ARENA_OPENAI_API_KEY }}
+          MODE: ${{ github.event.inputs.mode }}
+          MINUTES: ${{ github.event.inputs.minutes }}
+        run: |
+          set -e
+          python -m uvicorn server.app:app --host 127.0.0.1 --port 8798 --log-level warning &
+          ./cloudflared tunnel --url http://localhost:8798 --no-autoupdate > cf.log 2>&1 &
+          URL=""
+          for i in $(seq 1 40); do URL=$(grep -oE 'https://[-a-z0-9]+\.trycloudflare\.com' cf.log | head -1 || true); [ -n "$URL" ] && break; sleep 1; done
+          [ -n "$URL" ] || { echo "tunnel 逾時"; cat cf.log; exit 1; }
+          sleep 3
+          {
+            echo "## 對戰伺服器已在 GitHub 免費雲端上線"
+            echo "- 公開網址：$URL"
+            echo "- 大眾介面：$URL/game/index.html"
+            echo "- 像素劇場：$URL/game/arena.html"
+          } >> "$GITHUB_STEP_SUMMARY"
+          MODE="${MODE:-quiz}"
+          if [ "$MODE" = "task" ]; then
+            MC='{"tasks":[{"id":"t1","prompt":"抽出 email 成 JSON 陣列","context":"ann@a.com 與 bob@b.com","check":{"kind":"json_keys","min_items":2}}]}'
+          else
+            MC='{"questions":[{"id":"q1","prompt":"日本的首都是哪座城市？只回答城市名。","answer":"東京","kind":"contains"},{"id":"q2","prompt":"17 乘以 23 等於多少？只回答數字。","answer":"391","kind":"numeric"}]}'
+          fi
+          if [ -n "${ARENA_OPENAI_API_KEY:-}" ]; then
+            AGENTS='[{"id":"Remote","adapter":"openai_compat","model":"grok-4.20","prompt_author":"cloud"},{"id":"Baseline","adapter":"mock","model":"demo","prompt_author":"cloud","params":{"reply":"東京"}}]'
+          else
+            AGENTS='[{"id":"Alpha","adapter":"mock","model":"demo-A","prompt_author":"x","params":{"reply":"東京"}},{"id":"Beta","adapter":"mock","model":"demo-B","prompt_author":"y","params":{"reply":"大阪"}}]'
+          fi
+          MID=$(curl -s --max-time 25 -X POST "http://127.0.0.1:8798/api/matches" -H 'content-type: application/json' \
+            -d "{\"mode\":\"$MODE\",\"ratings_path\":\"\",\"timeout_seconds\":150,\"max_wall_seconds\":400,\"mode_config\":$MC,\"agents\":$AGENTS}" \
+            | python -c "import sys,json;print(json.load(sys.stdin).get('match_id',''))" || true)
+          echo "- 本局觀戰：$URL/game/arena.html?match=$MID&api=$URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "伺服器上線 $URL ，保持 ${MINUTES:-20} 分鐘"
+          sleep $(( ${MINUTES:-20} * 60 ))
