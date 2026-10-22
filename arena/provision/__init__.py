@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from .base import Provisioner, Sandbox, TargetSpec
 from .cloudrun import CloudRunProvisioner
+from .freehost import FreeHostProvisioner
 from .local import LocalDockerProvisioner
 
 REGISTRY: dict[str, type[Provisioner]] = {
-    "local": LocalDockerProvisioner,
-    "cloudrun": CloudRunProvisioner,
+    "local": LocalDockerProvisioner,       # 本機 Docker，隔離私有（真脆弱映像走這條）
+    "freehost": FreeHostProvisioner,       # 免費空間（Cloudflare tunnel），僅 benign self 靶機
+    "cloudrun": CloudRunProvisioner,       # GCP Cloud Run（非完全免費，選項）
 }
 
 
