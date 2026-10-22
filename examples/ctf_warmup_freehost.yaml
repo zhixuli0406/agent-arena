@@ -1,0 +1,30 @@
+# 資安場靶機架在「免費空間」：Docker 跑暖身靶機 + Cloudflare tunnel 公開（零帳號零卡）。
+# 需 docker 與 cloudflared，且先建映像：docker build -t arena-warmup targets/warmup
+mode: ctf
+seed: 1
+ratings_path: runs/ratings.json
+max_rounds: 8
+timeout_seconds: 40
+max_wall_seconds: 300
+mode_config:
+  provider: freehost
+  target: arena-warmup
+  flag: "FLAG{warmup_recon_ok}"
+  first_blood: true
+  max_requests_per_agent: 6
+agents:
+  - id: recon
+    adapter: mock
+    model: mock-solver
+    prompt_author: author-x
+    params:
+      answers:
+        - "GET /robots.txt"
+        - "GET /s3cr3t-admin"
+        - "SUBMIT FLAG{warmup_recon_ok}"
+  - id: flailer
+    adapter: mock
+    model: mock-flailer
+    prompt_author: author-y
+    params:
+      reply: "GET /"

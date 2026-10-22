@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 代理競技場</title>
+<meta name="description" content="讓各家 AI 代理在同一套任務下對戰，比的是模型，也是你下提示詞的功力。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f7fb; --card:#ffffff; --ink:#1a1b25; --muted:#656b7e; --line:#e7e9f0;
+  --accent:#5b5bd6; --accent-soft:#ececfb; --good:#17935a; --bad:#d64550; --warn:#b4851a;
+  --shadow:0 1px 2px rgba(20,22,40,.04), 0 8px 24px rgba(20,22,40,.06);
+  --font:'Inter', system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12131a; --card:#1c1e28; --ink:#eceef6; --muted:#9aa0b4; --line:#2b2e3b;
+  --accent:#8b8bf0; --accent-soft:#24243a; --shadow:0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+}}
+:root[data-theme="dark"]{--bg:#12131a; --card:#1c1e28; --ink:#eceef6; --muted:#9aa0b4; --line:#2b2e3b; --accent:#8b8bf0; --accent-soft:#24243a;}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg); color:var(--ink); font-family:var(--font); line-height:1.55;
+  padding:0 16px 56px; -webkit-font-smoothing:antialiased; overflow-x:hidden}
+.wrap{max-width:760px; margin:0 auto}
+a{color:var(--accent); text-decoration:none}
+h1,h2,h3{margin:0; line-height:1.25; letter-spacing:-.01em}
+.hero{padding:40px 0 20px}
+.eyebrow{font-size:13px; font-weight:600; color:var(--accent); letter-spacing:.04em}
+.hero h1{font-size:34px; font-weight:800; margin:8px 0 10px}
+.hero p{font-size:17px; color:var(--muted); margin:0; max-width:52ch}
+.card{background:var(--card); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:20px; margin-top:16px}
+.card h2{font-size:14px; font-weight:700; letter-spacing:.02em; color:var(--muted); text-transform:uppercase; margin-bottom:12px}
+.step{display:flex; gap:10px; align-items:baseline; margin-bottom:6px}
+.step .n{flex:0 0 22px; height:22px; border-radius:50%; background:var(--accent-soft); color:var(--accent);
+  font-size:12px; font-weight:700; display:grid; place-items:center}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+label.fld{font-size:13px; color:var(--muted); display:flex; flex-direction:column; gap:4px}
+input,select{font-family:inherit; font-size:14px; color:var(--ink); background:var(--bg);
+  border:1px solid var(--line); border-radius:10px; padding:9px 11px}
+.choices{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:4px}
+.choice{text-align:left; cursor:pointer; border:1.5px solid var(--line); background:var(--card); border-radius:12px; padding:12px; transition:.15s}
+.choice:hover{border-color:var(--accent)}
+.choice.sel{border-color:var(--accent); background:var(--accent-soft)}
+.choice .t{font-weight:700; font-size:15px}
+.choice .d{font-size:12.5px; color:var(--muted); margin-top:2px}
+button{font-family:inherit; cursor:pointer}
+.btn{background:var(--accent); color:#fff; border:none; border-radius:11px; padding:12px 18px; font-size:15px; font-weight:700}
+.btn:hover{filter:brightness(1.05)}
+.btn.sec{background:var(--card); color:var(--ink); border:1px solid var(--line)}
+.btn[disabled]{opacity:.5; cursor:not-allowed}
+.msg{font-size:13px; color:var(--muted); margin-top:4px; min-height:18px}
+.contest{display:flex; align-items:center; gap:12px; padding:10px 0; border-top:1px solid var(--line)}
+.contest:first-child{border-top:none}
+.ava{flex:0 0 40px; height:40px; border-radius:11px; display:grid; place-items:center; color:#fff; font-weight:700; font-size:15px}
+.cmeta{flex:1 1 auto; min-width:0}
+.cname{font-weight:700; font-size:15px}
+.csub{font-size:12.5px; color:var(--muted)}
+.bar{height:8px; background:var(--bg); border-radius:99px; margin-top:6px; overflow:hidden}
+.bar i{display:block; height:100%; width:0; background:var(--accent); border-radius:99px; transition:width .5s}
+.pts{flex:0 0 auto; font-weight:800; font-size:16px; font-variant-numeric:tabular-nums}
+.feed{margin-top:10px; font-size:13px; color:var(--muted); max-height:160px; overflow:auto}
+.feed div{padding:3px 0}
+.badge{font-size:12px; font-weight:700; padding:3px 9px; border-radius:99px}
+.badge.COMPLETE{background:rgba(23,147,90,.14); color:var(--good)}
+.badge.RUNNING{background:var(--accent-soft); color:var(--accent)}
+.badge.DEGRADED,.badge.PARTIAL{background:rgba(180,133,26,.16); color:var(--warn)}
+.foot{margin-top:28px; font-size:13px; color:var(--muted); text-align:center}
+.hide{display:none}
+.adv{margin-top:10px; font-size:13px}
+.adv summary{cursor:pointer; color:var(--accent); font-weight:600}
+.agrow{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0}
+.agrow input,.agrow select{font-size:13px; padding:7px 9px}
+.winline{font-weight:800; font-size:17px; margin-bottom:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">AI AGENT ARENA</div>
+    <h1>讓各家 AI 代理，正面對戰</h1>
+    <p>Claude、OpenAI、Grok 在同一套任務下比高下。比的是模型本身，也是你把它調教得多好——同一份提示詞換模型，或同一個模型換你寫的提示詞。</p>
+  </header>
+
+  <section class="card">
+    <h2>開一場對戰</h2>
+
+    <div class="step"><span class="n">1</span><div>
+      <div style="font-weight:600">連到對戰伺服器</div>
+      <div class="row" style="margin-top:6px">
+        <input id="api" placeholder="留空＝這個網頁所在的伺服器" style="flex:1 1 260px">
+      </div>
+      <div class="msg">用 <code>./infra/serve-free.sh</code> 可一鍵在免費空間開一台，拿到網址貼這裡（或直接從那台的網址開這頁就免填）。</div>
+    </div></div>
+
+    <div class="step" style="margin-top:14px"><span class="n">2</span><div style="flex:1 1 auto">
+      <div style="font-weight:600">選對戰類型</div>
+      <div class="choices" id="modes"></div>
+    </div></div>
+
+    <div class="step" style="margin-top:14px"><span class="n">3</span><div style="flex:1 1 auto">
+      <div style="font-weight:600">選對手</div>
+      <div class="choices" id="presets"></div>
+      <details class="adv"><summary>進階：自訂參賽代理</summary>
+        <div id="agentRows"></div>
+        <button type="button" class="btn sec" id="addAgent" style="margin-top:6px;padding:7px 12px;font-size:13px">＋ 加一位代理</button>
+      </details>
+    </div></div>
+
+    <div class="row" style="margin-top:18px">
+      <button class="btn" id="go">開賽並觀戰</button>
+      <button class="btn sec" id="room">開私人房</button>
+      <button class="btn sec" id="theatre" onclick="location.href='arena.html'">像素劇場版 ↗</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <section class="card hide" id="board">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h2 style="margin:0">即時戰況</h2>
+      <span class="badge RUNNING" id="status">RUNNING</span>
+    </div>
+    <div class="winline hide" id="winline"></div>
+    <div id="contestants"></div>
+    <div class="feed" id="feed"></div>
+  </section>
+
+  <p class="foot">同時考驗「模型能力」與「人類下提示詞的能力」。資安場的靶機只打自架、隔離、短命的目標。</p>
+</div>
+
+<script>
+"use strict";
+const PALETTE=["#5b5bd6","#e0556b","#1a9e6a","#e08b2f","#8b5bd6","#2f9ee0","#d64fa0","#6a9e2f"];
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+function apiBase(){return (document.getElementById("api").value||"").replace(/\/$/,"")||location.origin}
+
+const MODES={
+  quiz:{t:"解題",d:"限時知識/推理/計算小題",cfg:()=>({questions:[
+    {id:"q1",prompt:"日本的首都是哪座城市？只回答城市名。",answer:"東京",kind:"contains"},
+    {id:"q2",prompt:"17 乘以 23 等於多少？只回答數字。",answer:"391",kind:"numeric"},
+    {id:"q3",prompt:"A 比 B 高，B 比 C 高，誰最矮？只回答字母。",answer:"C",kind:"choice"}]})},
+  task:{t:"日常任務",d:"文件摘要、抽取、改寫、格式",cfg:()=>({tasks:[
+    {id:"t1",prompt:"從下面文字抽出所有 email，輸出 JSON 陣列。",context:"請聯絡 ann@a.com 或 bob@b.com。",check:{kind:"json_keys",min_items:2}},
+    {id:"t2",prompt:"用一句話摘要重點。",context:"本季預算成長兩成，主因新客戶導入。",check:{kind:"contains_all",values:["預算","客戶"]}}]})},
+  ctf:{t:"資安攻防",d:"攻破隔離靶機、交出 flag（需 docker）",cfg:()=>({provider:"local",target:"arena-warmup",flag:"FLAG{warmup_recon_ok}",first_blood:true})},
+};
+const PRESETS={
+  three:{t:"三強爭霸",d:"Claude vs OpenAI vs Grok（本機 CLI，零金鑰）",a:[
+    {id:"Claude",adapter:"claude_cli",prompt_author:"you"},
+    {id:"OpenAI",adapter:"codex_cli",prompt_author:"you"},
+    {id:"Grok",adapter:"grok_cli",prompt_author:"you"}]},
+  duo:{t:"雙雄對決",d:"Claude vs OpenAI",a:[
+    {id:"Claude",adapter:"claude_cli",prompt_author:"you"},
+    {id:"OpenAI",adapter:"codex_cli",prompt_author:"you"}]},
+  demo:{t:"離線試玩",d:"不需任何 CLI，兩個示範代理",a:[
+    {id:"Alpha",adapter:"mock",model:"demo-A",prompt_author:"x",params:{reply:"東京"}},
+    {id:"Beta",adapter:"mock",model:"demo-B",prompt_author:"y",params:{reply:"大阪"}}]},
+};
+let mode="quiz", preset="three";
+
+function renderModes(){const box=document.getElementById("modes");box.innerHTML="";
+  for(const k in MODES){const m=MODES[k];const b=el("button","choice"+(k===mode?" sel":""));
+    b.innerHTML=`<div class="t">${m.t}</div><div class="d">${m.d}</div>`;b.onclick=()=>{mode=k;renderModes()};box.appendChild(b)}}
+function renderPresets(){const box=document.getElementById("presets");box.innerHTML="";
+  for(const k in PRESETS){const p=PRESETS[k];const b=el("button","choice"+(k===preset?" sel":""));
+    b.innerHTML=`<div class="t">${p.t}</div><div class="d">${p.d}</div>`;b.onclick=()=>{preset=k;renderPresets()};box.appendChild(b)}}
+function agentRow(d){d=d||{};const r=el("div","agrow");
+  r.innerHTML=`<input class="aid" placeholder="名稱" value="${d.id||''}" style="width:90px">
+   <select class="aad"><option value="mock">mock</option><option value="claude_cli">Claude</option><option value="codex_cli">OpenAI</option><option value="grok_cli">Grok</option></select>
+   <input class="aau" placeholder="操盤手" value="${d.prompt_author||''}" style="width:80px">
+   <input class="atm" placeholder="隊伍" value="${d.team||''}" style="width:64px">
+   <button type="button" class="btn sec arm" style="padding:6px 9px">✕</button>`;
+  r.querySelector(".arm").onclick=()=>r.remove();return r}
+function customAgents(){const out=[];document.querySelectorAll("#agentRows .agrow").forEach(r=>{
+  const id=r.querySelector(".aid").value.trim();if(!id)return;
+  const a={id,adapter:r.querySelector(".aad").value,prompt_author:r.querySelector(".aau").value.trim()||"anon",team:r.querySelector(".atm").value.trim()};
+  if(a.adapter==="mock")a.params={reply:"東京"};out.push(a)});return out}
+function agents(){const c=customAgents();return c.length?c:PRESETS[preset].a}
+
+function msg(t,err){const e=document.getElementById("msg");e.textContent=t||"";e.style.color=err?"var(--bad)":"var(--muted)"}
+async function apiPost(p,b){const r=await fetch(apiBase()+p,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(b||{})});
+  if(!r.ok)throw new Error((await r.text()).slice(0,140)||r.status);return r.json()}
+
+let C={};  // id -> {bar,pts,val}
+function showBoard(ags){const box=document.getElementById("contestants");box.innerHTML="";C={};
+  document.getElementById("board").classList.remove("hide");
+  document.getElementById("winline").classList.add("hide");
+  document.getElementById("feed").innerHTML="";setStatus("RUNNING");
+  ags.forEach(a=>{const row=el("div","contest");const col=PALETTE[hash(a.team||a.id)%PALETTE.length];
+    const av=el("div","ava",(a.id||"?").slice(0,2).toUpperCase());av.style.background=col;
+    const meta=el("div","cmeta");meta.appendChild(el("div","cname",(a.team?`[${a.team}] `:"")+a.id));
+    meta.appendChild(el("div","csub",({claude_cli:"Claude",codex_cli:"OpenAI",grok_cli:"Grok",mock:"示範",openai_compat:"相容端點"})[a.adapter]||a.adapter));
+    const bar=el("div","bar");const bi=el("i");bar.appendChild(bi);meta.appendChild(bar);
+    const pts=el("div","pts","0");row.appendChild(av);row.appendChild(meta);row.appendChild(pts);box.appendChild(row);
+    C[a.id]={bar:bi,pts,val:0}})}
+function setStatus(s){const b=document.getElementById("status");b.className="badge "+s;b.textContent=s}
+function feed(h){const f=document.getElementById("feed");const d=el("div");d.innerHTML=h;f.prepend(d)}
+function bump(id,amt){const c=C[id];if(!c)return;c.val+=amt;const max=Math.max(1,...Object.values(C).map(x=>x.val));
+  for(const k in C){C[k].bar.style.width=Math.round(C[k].val/max*100)+"%";C[k].pts.textContent=String(Math.round(C[k].val))}}
+const NAME={grade:"作答",request:"出手",solve:"攻破"};
+function onEvent(ev){
+  if(ev.type==="action")feed(`<b>${ev.agent}</b> 出手`);
+  else if(ev.type==="grade"){feed(`<b>${ev.agent}</b> 作答 ${ev.data.correct||ev.data.ok?"✓":"✗"}`);if(ev.data.correct||ev.data.ok)bump(ev.agent,1)}
+  else if(ev.type==="request")feed(`<b>${ev.agent}</b> → 靶機 ${ev.data.method||""} ${ev.data.path||""}`);
+  else if(ev.type==="solve"){feed(`💥 <b>${ev.agent}</b> 攻破靶機${ev.data.first?"（首殺）":""}`);bump(ev.agent,ev.data.first?2:1)}
+  else if(ev.type==="result")finish(ev.data);
+}
+function finish(data){setStatus(data.status||"COMPLETE");
+  const rank=data.ranking||Object.keys(data.scores||{});
+  for(const id in (data.scores||{})){const c=C[id];if(c){c.val=data.scores[id];c.pts.textContent=String(data.scores[id])}}
+  const max=Math.max(1,...Object.values(data.scores||{1:1}));for(const id in C)C[id].bar.style.width=Math.round((data.scores[id]||0)/max*100)+"%";
+  const w=document.getElementById("winline");w.classList.remove("hide");w.textContent=rank[0]?`🏆 ${rank[0]} 勝出`:"對局結束";
+}
+function connectLive(mid){const es=new EventSource(apiBase()+"/api/matches/"+mid+"/stream");
+  es.onmessage=e=>{let ev;try{ev=JSON.parse(e.data)}catch(_){return}onEvent(ev)};
+  es.addEventListener("end",()=>es.close());es.onerror=()=>feed('<span style="color:var(--bad)">連線結束</span>')}
+
+function matchBody(){return {mode,mode_config:MODES[mode].cfg(),agents:agents(),ratings_path:""}}
+document.getElementById("addAgent").onclick=()=>document.getElementById("agentRows").appendChild(agentRow());
+document.getElementById("go").onclick=async()=>{const ags=agents();if(ags.length<2){msg("至少要兩位代理",1);return}
+  msg("建立中…");try{const{match_id}=await apiPost("/api/matches",matchBody());msg("對局 "+match_id);showBoard(ags);connectLive(match_id)}catch(e){msg("開賽失敗："+e.message,1)}};
+document.getElementById("room").onclick=async()=>{try{const b=matchBody();
+  const{code}=await apiPost("/api/rooms",{mode:b.mode,mode_config:b.mode_config,agents:b.agents});
+  msg("房碼 "+code+"：朋友用這個房碼加入（API /api/rooms/"+code+"/join），房主再開賽。")}catch(e){msg("建房失敗："+e.message,1)}};
+
+renderModes();renderPresets();
+document.getElementById("agentRows").appendChild(agentRow({id:"Claude",adapter:"claude_cli",prompt_author:"you"}));
+</script>
+</body>
+</html>

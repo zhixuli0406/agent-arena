@@ -1,0 +1,37 @@
+# G1 靶機白名單：只有這些映像可被配置器拉起，不在清單一律拒絕。
+# 這是把「資安對戰」釘死在授權、隔離靶機範圍內的第一道硬關卡。
+#
+# 全部為免費開源靶機（來源見 docs/research/ctf-targets.md：OWASP VWAD、vulhub）。
+# hosting 欄位：
+#   self = 本專案自帶的無害靶機，可用 freehost（免費空間公開）或 local。
+#   oss  = 真正脆弱的開源映像，只能 local（本機隔離私有），不得公開上網（ToS+安全）。
+images:
+  - name: arena-warmup
+    port: 8000
+    kind: self
+    hosting: [local, freehost]
+    note: 本專案自帶的暖身 recon 靶機，offline、小、快、只吐假 flag
+
+  - name: bkimminich/juice-shop
+    port: 3000
+    kind: oss
+    hosting: [local]
+    note: OWASP Juice Shop（Node，涵蓋 OWASP Top 10）
+
+  - name: vulnerables/web-dvwa
+    port: 80
+    kind: oss
+    hosting: [local]
+    note: DVWA（PHP，難度可調）
+
+  - name: webgoat/webgoat
+    port: 8080
+    kind: oss
+    hosting: [local]
+    note: OWASP WebGoat（Java）
+
+  - name: raesene/bwapp
+    port: 80
+    kind: oss
+    hosting: [local]
+    note: bWAPP（PHP/MySQL，100+ web bugs）

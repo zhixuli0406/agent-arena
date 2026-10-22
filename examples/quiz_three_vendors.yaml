@@ -1,0 +1,30 @@
+# 真實三方跨廠商對戰：Claude（claude）vs OpenAI（codex）vs Grok（grok）。
+# 三家各自用本機登入，設定不放任何金鑰。
+mode: quiz
+seed: 1
+ratings_path: runs/ratings.json
+timeout_seconds: 150
+max_wall_seconds: 500
+mode_config:
+  questions:
+    - id: cap-jp
+      prompt: "日本的首都是哪座城市？只回答城市名。"
+      answer: "東京"
+      kind: contains
+    - id: math-1
+      prompt: "17 乘以 23 等於多少？只回答數字。"
+      answer: "391"
+      kind: numeric
+agents:
+  - id: claude
+    adapter: claude_cli
+    system_prompt: "只輸出最終答案，不要解釋。"
+    prompt_author: team-anthropic
+  - id: codex
+    adapter: codex_cli
+    system_prompt: "Reply with only the final answer, no explanation."
+    prompt_author: team-openai
+  - id: grok
+    adapter: grok_cli
+    system_prompt: "Reply with only the final answer, no explanation."
+    prompt_author: team-xai

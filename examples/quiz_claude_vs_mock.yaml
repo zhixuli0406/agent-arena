@@ -1,0 +1,31 @@
+# 真模型對戰：本機 claude -p vs mock 對照組。需本機已登入 claude CLI。
+mode: quiz
+seed: 1
+ratings_path: runs/ratings.json
+timeout_seconds: 120
+mode_config:
+  questions:
+    - id: cap-jp
+      prompt: "日本的首都是哪座城市？"
+      answer: "東京"
+      kind: contains
+    - id: math-1
+      prompt: "17 乘以 23 等於多少？只回答數字。"
+      answer: "391"
+      kind: numeric
+    - id: logic-1
+      prompt: "A 比 B 高，B 比 C 高。三人中誰最矮？只回答一個字母。"
+      answer: "C"
+      kind: contains
+agents:
+  - id: claude
+    adapter: claude_cli
+    model: ""
+    system_prompt: "你是嚴謹的解題者。只輸出最終答案，不要任何解釋或多餘文字。"
+    prompt_author: louis
+  - id: baseline
+    adapter: mock
+    model: mock-dumb
+    prompt_author: baseline
+    params:
+      answers: ["大阪", "390", "A"]

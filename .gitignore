@@ -1,0 +1,17 @@
+# 對戰留痕（含完整靶機回應與 exploit 流量，視為敏感產物）
+runs/
+ratings.json
+
+# 本機金鑰，絕不入 repo
+*.key
+*-key.json
+*credentials*.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+dist/
+build/

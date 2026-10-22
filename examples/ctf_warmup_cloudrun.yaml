@@ -1,0 +1,32 @@
+# 雲端資安場：把暖身靶機自動部署成 Cloud Run 服務（免費額度、用完即刪）。
+# 依 gcp-deploy 規範以 SA 部署；需本機有 SA 金鑰與 gcloud。
+# 部署較久，故 max_wall_seconds 放寬。
+mode: ctf
+seed: 1
+ratings_path: runs/ratings.json
+max_rounds: 8
+timeout_seconds: 30
+max_wall_seconds: 600
+mode_config:
+  provider: cloudrun
+  target: arena-warmup
+  flag: "FLAG{cloudrun_recon_ok}"
+  first_blood: true
+  max_requests_per_agent: 6
+  ttl_seconds: 1800
+agents:
+  - id: recon
+    adapter: mock
+    model: mock-solver
+    prompt_author: author-x
+    params:
+      answers:
+        - "GET /robots.txt"
+        - "GET /s3cr3t-admin"
+        - "SUBMIT FLAG{cloudrun_recon_ok}"
+  - id: flailer
+    adapter: mock
+    model: mock-flailer
+    prompt_author: author-y
+    params:
+      reply: "GET /"

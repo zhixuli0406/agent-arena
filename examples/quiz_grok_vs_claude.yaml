@@ -1,0 +1,35 @@
+# 跨廠商對戰：Grok（OpenAI 相容端點）vs 本機 claude。
+# 需先設定環境變數：
+#   export ARENA_OPENAI_BASE_URL=https://api.x.ai/v1
+#   export ARENA_OPENAI_API_KEY=xai-...
+mode: quiz
+seed: 1
+ratings_path: runs/ratings.json
+timeout_seconds: 120
+mode_config:
+  questions:
+    - id: cap-jp
+      prompt: "日本的首都是哪座城市？"
+      answer: "東京"
+      kind: contains
+    - id: math-1
+      prompt: "17 乘以 23 等於多少？只回答數字。"
+      answer: "391"
+      kind: numeric
+    - id: logic-1
+      prompt: "A 比 B 高，B 比 C 高。三人中誰最矮？只回答一個字母。"
+      answer: "C"
+      kind: contains
+agents:
+  - id: grok
+    adapter: openai_compat
+    model: grok-4.20
+    system_prompt: "只輸出最終答案，不要解釋。"
+    prompt_author: team-grok
+    params:
+      base_url_env: ARENA_OPENAI_BASE_URL
+      api_key_env: ARENA_OPENAI_API_KEY
+  - id: claude
+    adapter: claude_cli
+    system_prompt: "只輸出最終答案，不要解釋。"
+    prompt_author: team-claude

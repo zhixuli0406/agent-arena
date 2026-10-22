@@ -1,0 +1,30 @@
+# 本機資安場：mock 攻擊者 vs 暖身靶機（arena-warmup）。
+# 需 docker，且先建映像：docker build -t arena-warmup targets/warmup
+# recon 腳本化示範「讀 robots.txt → 找到隱藏路徑 → 交 flag」；flailer 亂打對照。
+mode: ctf
+seed: 1
+ratings_path: runs/ratings.json
+max_rounds: 8
+timeout_seconds: 30
+mode_config:
+  provider: local
+  target: arena-warmup
+  flag: "FLAG{warmup_recon_ok}"
+  first_blood: true
+  max_requests_per_agent: 6
+agents:
+  - id: recon
+    adapter: mock
+    model: mock-solver
+    prompt_author: author-x
+    params:
+      answers:
+        - "GET /robots.txt"
+        - "GET /s3cr3t-admin"
+        - "SUBMIT FLAG{warmup_recon_ok}"
+  - id: flailer
+    adapter: mock
+    model: mock-flailer
+    prompt_author: author-y
+    params:
+      reply: "GET /"
