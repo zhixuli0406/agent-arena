@@ -11,7 +11,10 @@
 - 公開原始碼：https://github.com/zhixuli0406/agent-arena
 - 大眾介面（GitHub Pages，持久）：https://zhixuli0406.github.io/agent-arena/web/index.html
 - 像素劇場：https://zhixuli0406.github.io/agent-arena/web/arena.html
-- 即時對戰需一台跑著的伺服器：`./infra/play-free.sh` 一鍵在免費空間起站並自動開賽，把網址填進介面即可連動。
+- 即時對戰需一台跑著的伺服器，三種免費起站方式：
+  - 本機一鍵：`./infra/play-free.sh`（免費 tunnel 起站＋自動開賽）。
+  - **雲端一鍵（GitHub Actions 免費 runner，不佔本機）**：Actions 分頁按 Run「Arena free-cloud server」，或 `gh workflow run arena-cloud.yml`；會在 GitHub 免費雲端起伺服器並把公開觀戰網址印在 job summary。雲端跑真實跨廠商：把金鑰設為 repo secrets（`ARENA_OPENAI_BASE_URL`/`ARENA_OPENAI_API_KEY`）。
+  - 持久固定網址：接免費帳號制 host（Render 等，需你的帳號金鑰）。
 
 ## 目錄
 
