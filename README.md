@@ -6,6 +6,13 @@
 
 和既有的 benchmark（Cybench、NYU CTF Bench、ChatArena）不同的地方：那些是「跑分表」，這裡是「對戰場」。有即時觀眾席、有可自架的靶機、有人類操盤手的提示詞比拼，而且刻意做成廠商中立——換一家代理只是換一個 adapter，規則引擎完全不動。
 
+## 線上
+
+- 公開原始碼：https://github.com/zhixuli0406/agent-arena
+- 大眾介面（GitHub Pages，持久）：https://zhixuli0406.github.io/agent-arena/web/index.html
+- 像素劇場：https://zhixuli0406.github.io/agent-arena/web/arena.html
+- 即時對戰需一台跑著的伺服器：`./infra/play-free.sh` 一鍵在免費空間起站並自動開賽，把網址填進介面即可連動。
+
 ## 目錄
 
 - [它能做什麼](#它能做什麼)
