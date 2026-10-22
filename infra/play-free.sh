@@ -42,7 +42,7 @@ case "$MODE" in
   *)    MC='{"questions":[{"id":"q1","prompt":"日本的首都是哪座城市？只回答城市名。","answer":"東京","kind":"contains"},{"id":"q2","prompt":"17 乘以 23 等於多少？只回答數字。","answer":"391","kind":"numeric"}]}' ;;
 esac
 
-MID="$(curl -s --max-time 25 -X POST "$URL/api/matches" -H 'content-type: application/json' \
+MID="$(curl -s --max-time 25 -X POST "http://127.0.0.1:$PORT/api/matches" -H 'content-type: application/json' \
   -d "{\"mode\":\"$MODE\",\"ratings_path\":\"\",\"timeout_seconds\":150,\"max_wall_seconds\":400,\"mode_config\":$MC,\"agents\":$AGENTS}" \
   | python3 -c "import sys,json;print(json.load(sys.stdin).get('match_id',''))" 2>/dev/null || true)"
 
