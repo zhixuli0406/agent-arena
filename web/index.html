@@ -375,6 +375,10 @@ document.getElementById("room").onclick=async()=>{try{const b=matchBody();
   msg("房碼 "+code+"：朋友用這個房碼加入（API /api/rooms/"+code+"/join），房主再開賽。")}catch(e){msg("建房失敗："+e.message,1)}};
 
 renderModes();renderPresets();
+// 自動連到現役免費雲端伺服器：排程 workflow 會把當前網址寫到固定位置 server.json
+(async()=>{ const f=document.getElementById("api"); if(f&&!f.value){ try{
+  const r=await fetch("server.json",{cache:"no-store"}); if(r.ok){ const j=await r.json();
+  if(j&&j.server){ f.value=j.server; msg("已自動連到現役免費雲端伺服器："+j.server); } } }catch(_){}} })();
 document.getElementById("agentRows").appendChild(agentRow({id:"Claude",adapter:"claude_cli",prompt_author:"you"}));
 </script>
 </body>
