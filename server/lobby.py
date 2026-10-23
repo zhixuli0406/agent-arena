@@ -611,7 +611,8 @@ class Lobby(PartyMixin):
             t.match_id, t.side = match_id, prop.sides.get(tid)
             t.ranked = ranked
             t.tokens = {m: tokens[m] for m in t.members if m in tokens}
-            self.wait_samples.append(now - t.enqueued_at)
+            if not self._ticket_has_house(t):
+                self.wait_samples.append(now - t.enqueued_at)
             self._end(t, "confirmed")
         self.wait_samples = self.wait_samples[-100:]
         self.proposals.pop(prop.id, None)

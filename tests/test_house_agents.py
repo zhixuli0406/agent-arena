@@ -84,6 +84,7 @@ def test_house_agents_never_match_each_other_and_fill_after_delay():
     assert starts[0]["mode"] == "quiz" and starts[0]["ranked"] is False
     assert set(starts[0]["players"]) == {bots[0].id, human.id}
     assert not human_ticket.ranked and not house_ticket.ranked
+    assert lobby.avg_wait() == HOUSE_FILL_DELAY + 0.1
 
 
 def test_two_humans_are_matched_before_house_fallback():
