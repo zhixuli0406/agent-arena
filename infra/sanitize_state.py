@@ -52,8 +52,10 @@ def lobby_state(data: object) -> dict:
             continue
         if isinstance(games, bool) or not isinstance(games, int) or not 0 <= games <= 10_000_000:
             continue
+        extra = d.get("extra_hashes", [])
+        extra = [x for x in extra if isinstance(x, str) and SECRET_HASH.match(x)][-4:] if isinstance(extra, list) else []
         players.append({"id": pid, "name": name, "rating": rating, "games": games,
-                        "agent": agent, "secret_hash": h})
+                        "agent": agent, "secret_hash": h, "extra_hashes": extra})
     return {"version": 1, "players": players}
 
 

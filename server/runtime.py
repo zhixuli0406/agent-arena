@@ -22,6 +22,7 @@ from arena.elo import Ratings
 from arena.engine import MatchReport, run_match
 from arena.types import AgentSpec, MatchConfig
 
+from .agents import AgentHub
 from .i18n import I18nError
 from .lobby import Lobby, Player
 from .question_bank import pick
@@ -253,10 +254,14 @@ def _lobby_start(mode: str, players: list[Player], ranked: bool = True,
             lobby.apply_rating(pid, rep.elo_deltas.get(aid, {}).get("prompt", 0.0))
 
     mid = start_match(cfg, on_done=_ladder, meta={"source": "lobby", "ranked": ranked})
+    for p in players:                         # the seat token goes to the player's agent, never to the lobby page
+        hub.assign(p.id, {"match_id": mid, "token": tokens[p.id], "mode": mode, "ranked": ranked,
+                             "side": (teams or {}).get(p.id)})
     return mid, tokens
 
 
 lobby = Lobby(_lobby_start)
+hub = AgentHub()          # agent standby channels: presence + seat dispatch
 
 
 def leaderboard(limit: int = 20) -> dict[str, Any]:

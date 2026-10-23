@@ -45,6 +45,9 @@ FORMATS = ("ffa", *TEAM_FORMATS)
 SIDES = ("red", "blue")
 ROOM_MAX = 8
 ROOM_CODE_LEN = 7
+LINK_CODE_LEN = 8         # one-time link code: hands a new credential for the same player to an agent or a browser
+LINK_TTL = 600.0
+MAX_EXTRA_CREDS = 4       # credentials minted through link codes, newest kept
 ROOM_OPEN_TTL = 3600.0    # reap unstarted rooms after this long idle
 ROOM_STARTED_TTL = 1800.0 # how long started rooms are kept (so members can still look up token / match_id)
 MATCH_BUDGET = 0.05       # max seconds per queue per tick spent matching (runs on the event loop; leftovers wait for the next tick)
@@ -68,6 +71,7 @@ class Player:
     games: int = 0
     ip: str = ""
     ips: list[str] = field(default_factory=list)   # source IPs of recent requests (for same-network checks; not persisted)
+    extra_hashes: list[str] = field(default_factory=list)   # credentials minted through link codes (hashes only)
 
     def saw_ip(self, ip: str) -> None:
         if ip and ip not in self.ips:
@@ -146,6 +150,7 @@ class Lobby(PartyMixin):
         self.proposals: dict[str, Proposal] = {}
         self.rooms: dict[str, Room] = {}
         self.parties: dict[str, Party] = {}
+        self.links: dict[str, tuple[str, float]] = {}   # link code -> (player id, expires at)
         self.wait_samples: list[float] = []
         self.dirty = False              # there are changes to persist
 
@@ -165,8 +170,11 @@ class Lobby(PartyMixin):
 
     def auth(self, player_id: str, secret: str, ip: str = "") -> Player:
         p = self.players.get(player_id or "")
-        if p is None or not secrets.compare_digest(p.secret_hash, _hash(secret or "")):
-            raise LobbyError("auth_failed", 401)
+        h = _hash(secret or "")
+        if p is None:                       # forgotten (a guest that never played, after a restart or reap)
+            raise LobbyError("player_unknown", 401)
+        if not any(secrets.compare_digest(x, h) for x in [p.secret_hash, *p.extra_hashes]):
+            raise LobbyError("auth_failed", 401)        # wrong or revoked credential
         p.last_seen = self._clock()
         p.saw_ip(ip)                       # record on every request: the networks party members actually use count toward same-network checks
         return p
@@ -274,6 +282,7 @@ class Lobby(PartyMixin):
                 self.tickets.pop(t.id, None)
         self._reap_rooms(now)                                # 4) reap idle rooms, parties and guests
         self._reap_parties(now)
+        self.links = {c: v for c, v in self.links.items() if v[1] > now}
         self._reap_guests()
 
     def _match_pool(self, mode: str, size: int, pool: list[Ticket], now: float) -> None:
@@ -585,12 +594,49 @@ class Lobby(PartyMixin):
     def _end(self, t: Ticket, status: str) -> None:
         t.status, t.ended_at = status, self._clock()
 
+    # ---------------- Link codes (website <-> agent, same player) ----------------
+    def create_link(self, player: Player) -> tuple[str, float]:
+        """A one-time, short-lived code. Whoever redeems it gets a NEW credential for this player, so an agent
+        never needs the browser's secret (and the browser never needs the agent's)."""
+        now = self._clock()
+        self.links = {c: v for c, v in self.links.items() if v[0] != player.id and v[1] > now}
+        alphabet = string.ascii_uppercase.replace("O", "").replace("I", "") + "23456789"
+        while True:
+            code = "".join(secrets.choice(alphabet) for _ in range(LINK_CODE_LEN))
+            if code not in self.links:
+                break
+        self.links[code] = (player.id, now + LINK_TTL)
+        return code, LINK_TTL
+
+    def redeem_link(self, code: str) -> tuple[Player, str]:
+        entry = self.links.pop((code or "").strip().upper(), None)
+        now = self._clock()
+        if entry is None or entry[1] <= now or entry[0] not in self.players:
+            raise LobbyError("link_invalid", 404)
+        p = self.players[entry[0]]
+        secret = secrets.token_urlsafe(18)
+        p.extra_hashes = (p.extra_hashes + [_hash(secret)])[-MAX_EXTRA_CREDS:]
+        p.last_seen = now
+        self.dirty = True
+        return p, secret
+
+    def has_credential(self, player_id: str, secret_hash: str) -> bool:
+        p = self.players.get(player_id)
+        return p is not None and any(secrets.compare_digest(x, secret_hash) for x in [p.secret_hash, *p.extra_hashes])
+
+    def reset_credentials(self, player: Player, secret: str) -> None:
+        """Keep only the credential making this call: every other browser and linked agent is signed out,
+        and unused link codes die. The way to recover from a leaked secret or link."""
+        player.secret_hash, player.extra_hashes = _hash(secret), []
+        self.links = {c: v for c, v in self.links.items() if v[0] != player.id}
+        self.dirty = True
+
     # ---------------- Persistence ----------------
     def dump(self) -> dict:
         """Only players who have played a match are saved; secrets are stored as hashes only (backups go to the public repo's data branch)."""
         return {"version": 1, "players": [
             {"id": p.id, "name": p.name, "rating": round(p.rating, 2), "games": p.games,
-             "agent": p.agent_label, "secret_hash": p.secret_hash}
+             "agent": p.agent_label, "secret_hash": p.secret_hash, "extra_hashes": list(p.extra_hashes)}
             for p in self.players.values() if p.games > 0]}
 
     def restore(self, data: dict) -> int:
@@ -603,9 +649,10 @@ class Lobby(PartyMixin):
                 rating, games = float(d.get("rating", 1500.0)), int(d.get("games", 0))
             except (TypeError, ValueError):
                 continue
+            extra = [x for x in (d.get("extra_hashes") or []) if isinstance(x, str) and len(x) == 64][-MAX_EXTRA_CREDS:]
             self.players[pid] = Player(
                 id=pid, name=clean_text(str(d.get("name", "")), NAME_MAX) or "Player", secret="", secret_hash=h,
-                rating=rating, agent_label=clean_text(str(d.get("agent", "")), 40), games=games)
+                rating=rating, agent_label=clean_text(str(d.get("agent", "")), 40), games=games, extra_hashes=extra)
             n += 1
         return n
 

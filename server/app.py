@@ -74,6 +74,7 @@ async def _matchmaker() -> None:
                 rt.save_state()                       # flush rating changes to disk every 30 seconds
             if n % 60 == 0:
                 rt.reap()                             # reap expired matches and transcripts every minute
+                rt.hub.reap()
         except Exception:  # noqa: BLE001 — the matchmaking loop must not die, but log every failure
             log.exception("matchmaker tick failed")
         await asyncio.sleep(1)

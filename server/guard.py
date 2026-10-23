@@ -63,6 +63,8 @@ RULES = {
     "queue": Rule("queue", 30, 3600),
     "action": Rule("action", 10, 1),
     "demo": Rule("demo", 6, 3600),
+    "link": Rule("link", 20, 3600),
+    "redeem": Rule("redeem", 30, 3600),        # 8-char codes from 31 symbols: guessing at this rate is hopeless
 }
 
 
@@ -106,6 +108,9 @@ ROUTE_RULES: list[tuple[str, str, tuple[str, ...]]] = [
     ("POST", "/api/lobby/parties", ("room_create",)),       # creating parties and rooms share one quota
     ("POST", "/api/lobby/queue", ("queue",)),
     ("POST", "/api/demo", ("demo",)),
+    ("POST", "/api/lobby/link", ("link",)),
+    ("POST", "/api/lobby/link/redeem", ("redeem",)),
+    ("POST", "/api/lobby/credentials/reset", ("link",)),
 ]
 
 
@@ -130,6 +135,8 @@ class StreamCounter:
 streams = StreamCounter()
 MAX_STREAMS_PER_IP = 6
 MAX_STREAMS_PER_TOKEN = 3
+MAX_AGENT_STREAMS = 2        # standby streams per player (one agent, plus room for a reconnect)
+MAX_AGENT_STREAMS_PER_IP = 8 # standby streams per network (a household of players, each with an agent)
 
 
 def client_key(request: Request, ip: str) -> str:

@@ -13,6 +13,7 @@ from server import app as app_mod
 from server import guard
 from server import runtime as rt
 from server.app import _obs_payload, app
+from server.agents import AgentHub
 from server.lobby import Lobby
 
 
@@ -20,6 +21,7 @@ from server.lobby import Lobby
 def fresh_state(monkeypatch, tmp_path):
     guard.limiter.reset()
     monkeypatch.setattr(rt, "lobby", Lobby(rt._lobby_start))
+    monkeypatch.setattr(rt, "hub", AgentHub())
     monkeypatch.setattr(rt, "STATE_PATH", str(tmp_path / "state.json"))
     monkeypatch.setattr(rt, "RUNS_DIR", str(tmp_path / "runs"))
     yield
@@ -30,8 +32,12 @@ def hdr(reg):
     return {"X-Player-Id": reg["player"]["id"], "X-Player-Secret": reg["secret"]}
 
 
-def reg(c, name, **kw):
-    return c.post("/api/lobby/players", json={"name": name, **kw}).json()
+def reg(c, name, online=True, **kw):
+    """Register a player; by default their agent is marked online (players must bring an agent to play)."""
+    r = c.post("/api/lobby/players", json={"name": name, **kw}).json()
+    if online:
+        rt.hub.connect(r["player"]["id"])
+    return r
 
 
 def test_public_policy_rejects_host_adapters_and_translates():
@@ -295,13 +301,16 @@ def test_party_team_queue_over_http(monkeypatch):
         assert v["status"] == "confirmed"
         va = c.get(f"/api/lobby/tickets/{td['ticket_id']}", headers=hdr(a)).json()
         vb = c.get(f"/api/lobby/tickets/{td['ticket_id']}", headers=hdr(b)).json()
-        assert va["token"] and vb["token"] and va["token"] != vb["token"] and va["side"] == vb["side"]
+        assert "token" not in va and va["side"] == vb["side"]                        # seats go to the agents only
+        ta = rt.hub.pending(a["player"]["id"], 0)[-1]
+        tb = rt.hub.pending(b["player"]["id"], 0)[-1]
+        assert ta["token"] != tb["token"] and ta["match_id"] == tb["match_id"] == va["match_id"] and ta["side"] == va["side"]
         mid = va["match_id"]
         listed = {m["match_id"]: m for m in c.get("/api/lobby/matches").json()["matches"]}
         sides = listed[mid]["sides"]                                                  # spectate list includes sides
         assert sides["Lead"] == sides["Mate"] != sides["Solo1"] == sides["Solo2"]
         rt.matches[mid]["task"].cancel()
-        drop_slot(va["token"])
+        drop_slot(ta["token"])
 
 
 def test_daily_cap_counts_opponent_pairs_not_whole_lobby():

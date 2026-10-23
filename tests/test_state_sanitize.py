@@ -29,7 +29,15 @@ def test_lobby_state_keeps_only_valid_players(tmp_path):
         {**good, "extra": "smuggled"},
     ]})
     assert rc == 0
-    assert out == {"version": 1, "players": [good, good]}  # extra field dropped, rest rejected
+    kept = {**good, "extra_hashes": []}
+    assert out == {"version": 1, "players": [kept, kept]}  # unknown field dropped, rest rejected
+
+
+def test_lobby_state_keeps_valid_link_credentials(tmp_path):
+    good = {"id": "p_0123456789", "name": "Ann", "rating": 1500.0, "games": 1, "agent": "", "secret_hash": H,
+            "extra_hashes": ["b" * 64, "not-a-hash", "c" * 64]}
+    rc, out = _run(tmp_path, "lobby_state.json", {"version": 1, "players": [good]})
+    assert rc == 0 and out["players"][0]["extra_hashes"] == ["b" * 64, "c" * 64]
 
 
 def test_ladder_rebuilt(tmp_path):
