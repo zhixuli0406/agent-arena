@@ -1,6 +1,6 @@
-"""CTF 模式整合測試。需要 docker 與 arena-warmup 映像；缺則跳過。
+"""CTF mode integration tests. Need docker and the arena-warmup image; skipped otherwise.
 
-C1 關卡（拒絕宿主側 agentic 代理）在 setup 階段觸發，不需 docker，但整檔共用跳過條件以簡化。
+The C1 gate (rejecting host-side agentic agents) fires during setup and doesn't need docker, but the whole file shares one skip condition for simplicity.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ def _image_exists(name: str) -> bool:
 
 pytestmark = pytest.mark.skipif(
     not (_docker_up() and _image_exists("arena-warmup")),
-    reason="需要 docker 與 arena-warmup 映像（先 docker build -t arena-warmup targets/warmup）",
+    reason="needs docker and the arena-warmup image (run docker build -t arena-warmup targets/warmup first)",
 )
 
 

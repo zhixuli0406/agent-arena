@@ -1,14 +1,14 @@
-"""本機 Docker 配置器。開發與活體驗證用。
+"""Local Docker provisioner. For development and live verification.
 
-隔離模型（已實測）：靶機與「攻擊 runner」掛在同一個 --internal（無出網）網路，
-靶機不對外發佈任何埠，引擎透過 docker exec 驅動 runner 去打靶機。整個沙箱對外完全封閉。
+Isolation model (tested): the target and the attack runner share one --internal (no egress) network; the target
+publishes no ports, and the engine drives the runner via docker exec to hit the target. The whole sandbox is sealed off.
 
-硬性關卡：
-  G1 只配置 targets/allowlist.yaml 白名單內的映像。
-  G2 --internal 網路（無預設路由，靶機連不到外網）＋ 不發佈埠。
-  G3 容器掛 arena.match / arena.expires 標籤，供 reaper 回收；散場顯式 teardown。
-  G4 注入環境變數掃描疑似真實憑證（flag 例外），命中即拒。
-  容器硬化：--cap-drop ALL、--security-opt no-new-privileges、--pids-limit、--memory。
+Hard gates:
+  G1 only provisions images on the targets/allowlist.yaml allowlist.
+  G2 --internal network (no default route, the target can't reach the internet) + no published ports.
+  G3 containers and the isolated network carry arena.match / arena.expires labels for the reaper; explicit teardown at match end.
+  G4 injected env vars are scanned for real-looking credentials (the flag is exempt); any hit is rejected.
+  Container hardening: --cap-drop ALL, --security-opt no-new-privileges, --pids-limit, --memory.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from .base import Provisioner, Sandbox, TargetSpec
 _PIPE = asyncio.subprocess.PIPE
 _DEFAULT_ALLOWLIST = os.path.join(os.path.dirname(__file__), "..", "..", "targets", "allowlist.yaml")
 
-# runner 內用 python urllib 發請求；method/url/body 以 argv 傳入，無 shell。
+# The runner sends requests with python urllib; method/url/body are passed as argv, no shell.
 _FETCH = r"""
 import sys, urllib.request, urllib.error
 method, url = sys.argv[1], sys.argv[2]
@@ -46,7 +46,10 @@ async def _run(*argv: str, timeout: float = 60.0) -> tuple[int, bytes, bytes]:
     try:
         out, err = await asyncio.wait_for(proc.communicate(), timeout=timeout)
     except asyncio.TimeoutError:
-        proc.kill()
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
         return (124, b"", b"timeout")
     return (proc.returncode or 0, out, err)
 
@@ -67,7 +70,7 @@ class LocalDockerSandbox(Sandbox):
 
     async def http(self, method: str, path: str, body: str | None = None, timeout: float = 12.0) -> tuple[int, str]:
         if not path.startswith("/"):
-            path = "/" + path  # 釘在本局靶機，代理無法改打其他主機
+            path = "/" + path  # pinned to this match's target; agents can't hit other hosts
         url = self._base + path
         rc, out, err = await _run(
             "docker", "exec", self._runner, "python", "-c", _FETCH, method, url, body or "", timeout=timeout
@@ -98,20 +101,20 @@ class LocalDockerProvisioner(Provisioner):
     async def provision(self, target: TargetSpec, match_id: str, ttl_seconds: int = 1800) -> Sandbox:
         rc, _, err = await _run("docker", "version", "--format", "{{.Server.Version}}", timeout=15)
         if rc != 0:
-            raise RuntimeError(f"docker 不可用：{err.decode(errors='replace')[:120]}")
+            raise RuntimeError(f"docker unavailable: {err.decode(errors='replace')[:120]}")
 
-        # G1 白名單
+        # G1 allowlist
         meta = self.allowlist.get(target.image)
         if meta is None:
             raise PermissionError(
-                f"G1 拒絕：映像 {target.image!r} 不在白名單（{', '.join(self.allowlist)}）"
+                f"G1 rejected: image {target.image!r} is not on the allowlist ({', '.join(self.allowlist)})"
             )
         port = int(meta["port"])
 
-        # G4 祕密掃描（flag 例外）
+        # G4 secret scan (the flag is exempt)
         for k, v in (target.env or {}).items():
             if k != "FLAG" and looks_secret(str(v)):
-                raise PermissionError(f"G4 拒絕：環境變數 {k} 的值疑似真實憑證")
+                raise PermissionError(f"G4 rejected: the value of env var {k} looks like a real credential")
 
         net = f"arena-{match_id}"
         tgt = f"arena-tgt-{match_id}"
@@ -120,10 +123,10 @@ class LocalDockerProvisioner(Provisioner):
         labels = ["--label", f"arena.match={match_id}", "--label", f"arena.expires={expires}"]
         hard = ["--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "256", "--memory", "512m"]
 
-        # G2 無出網網路
-        rc, _, err = await _run("docker", "network", "create", "--internal", net, timeout=30)
+        # G2 no-egress network
+        rc, _, err = await _run("docker", "network", "create", "--internal", *labels, net, timeout=30)
         if rc != 0:
-            raise RuntimeError(f"建立隔離網路失敗：{err.decode(errors='replace')[:160]}")
+            raise RuntimeError(f"creating the isolated network failed: {err.decode(errors='replace')[:160]}")
 
         env_args: list[str] = []
         for k, v in (target.env or {}).items():
@@ -135,7 +138,7 @@ class LocalDockerProvisioner(Provisioner):
         )
         if rc != 0:
             await _run("docker", "network", "rm", net)
-            raise RuntimeError(f"啟動靶機失敗：{err.decode(errors='replace')[:160]}")
+            raise RuntimeError(f"starting the target failed: {err.decode(errors='replace')[:160]}")
 
         rc, _, err = await _run(
             "docker", "run", "-d", "--name", run, "--network", net, *labels, *hard,
@@ -145,11 +148,11 @@ class LocalDockerProvisioner(Provisioner):
         if rc != 0:
             await _run("docker", "rm", "-f", tgt)
             await _run("docker", "network", "rm", net)
-            raise RuntimeError(f"啟動 runner 失敗：{err.decode(errors='replace')[:160]}")
+            raise RuntimeError(f"starting the runner failed: {err.decode(errors='replace')[:160]}")
 
         sandbox = LocalDockerSandbox(net, tgt, run, f"http://{tgt}:{port}")
 
-        # 等靶機就緒（透過 runner 輪詢）
+        # wait for the target to be ready (polling through the runner)
         for _ in range(30):
             status, _body = await sandbox.http("GET", "/", timeout=8)
             if status != -1:

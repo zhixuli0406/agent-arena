@@ -1,6 +1,6 @@
-# 雲端資安場：把暖身靶機自動部署成 Cloud Run 服務（免費額度、用完即刪）。
-# 依 gcp-deploy 規範以 SA 部署；需本機有 SA 金鑰與 gcloud。
-# 部署較久，故 max_wall_seconds 放寬。
+# Cloud CTF match: deploys the warmup target as a Cloud Run service (free tier, deleted afterwards).
+# Deploys with a service account per the gcp-deploy rules; needs a local SA key and gcloud.
+# Deployment takes a while, so max_wall_seconds is raised.
 mode: ctf
 seed: 1
 ratings_path: runs/ratings.json

@@ -1,7 +1,8 @@
-"""暖身 CTF 靶機：一個故意留洞的小網站。offline、小、快，供活體驗證與入門。
+"""Warmup CTF target: a small site with a deliberate hole. Offline, small and fast, for live checks and beginners.
 
-挑戰：flag 藏在 robots.txt 揭露的隱藏路徑後面。考驗基本偵察（recon）。
-這是本專案自帶、授權測試用的靶機；flag 由配置器每局注入，非真實機密。
+Challenge: the flag sits behind a hidden path disclosed by robots.txt. Tests basic recon.
+This target ships with the project and is for authorized testing; the provisioner injects the flag per match,
+so it is not a real secret.
 """
 
 import os
@@ -34,11 +35,11 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def log_message(self, *args) -> None:  # 靜音
+    def log_message(self, *args) -> None:  # silence request logs
         pass
 
 
 if __name__ == "__main__":
-    # Cloud Run 會以 PORT 環境變數指定容器監聽埠；本機 Docker 預設 8000。
+    # Cloud Run sets the listening port via the PORT env var; local Docker defaults to 8000.
     port = int(os.environ.get("PORT", "8000"))
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()

@@ -1,4 +1,4 @@
-"""quiz 模式與引擎的端到端測試（全用 mock，離線、確定性），含 grade 假陽性迴歸。"""
+"""End-to-end tests for quiz mode and the engine (all mock, offline, deterministic), including grade false-positive regressions."""
 
 from __future__ import annotations
 
@@ -30,7 +30,8 @@ def _cfg(tmp_path) -> MatchConfig:
 async def test_alpha_sweeps(tmp_path):
     report = await run_match(_cfg(tmp_path), runs_dir=str(tmp_path / "runs"))
     assert report.status == "COMPLETE"
-    assert report.result.scores["alpha"] == 3.0
+    assert 3.0 < report.result.scores["alpha"] <= 4.5  # all 3 correct + speed bonus
+    assert [d["correct"] for d in report.result.details["per_agent"]["alpha"]] == [True] * 3
     assert report.result.scores["beta"] == 0.0
     assert report.result.ranking[0] == "alpha"
 
@@ -42,11 +43,11 @@ async def test_elo_winner_gains(tmp_path):
     assert report.elo_deltas["beta"]["model"] < 0
 
 
-# --- grade 迴歸：評審點名的假陽性必須被擋掉 ---
+# --- grade regressions: false positives flagged in review must be blocked ---
 
 def test_grade_exact_is_strict():
     assert grade({"answer": "東京", "kind": "exact"}, "東京")
-    assert not grade({"answer": "東京", "kind": "exact"}, "首都是東京")  # 嚴格：不做子字串
+    assert not grade({"answer": "東京", "kind": "exact"}, "首都是東京")  # strict: no substring match
     assert not grade({"answer": "C", "kind": "exact"}, "Carbon")
 
 
@@ -59,7 +60,7 @@ def test_grade_choice_no_false_positive():
 
 
 def test_grade_contains_short_ascii_uses_boundary():
-    # ASCII 短答案的 contains 自動升級為 token 邊界比對
+    # contains on short ASCII answers is upgraded to token-boundary matching
     assert not grade({"answer": "no", "kind": "contains"}, "Nope, the answer is yes")
     assert grade({"answer": "no", "kind": "contains"}, "the answer is no")
 
@@ -70,6 +71,51 @@ def test_grade_contains_cjk_substring():
 
 
 def test_grade_numeric_takes_last_number():
-    assert grade({"answer": "42", "kind": "numeric"}, "在 2024 年，答案是 42")  # 取最後一個數字
+    assert grade({"answer": "42", "kind": "numeric"}, "在 2024 年，答案是 42")  # takes the last number
     assert grade({"answer": "391", "kind": "numeric"}, "答案是 391")
     assert not grade({"answer": "390", "kind": "numeric"}, "答案是 391")
+
+
+def test_choice_rejects_listing_every_option():
+    from arena.modes.quiz import grade
+    q = {"answer": "C", "kind": "choice"}
+    assert grade(q, "C") and grade(q, "The answer is C")
+    assert not grade(q, "A B C D") and not grade(q, "C or D")
+
+
+def test_distractors_block_listing_all_weekdays():
+    from arena.modes.quiz import grade
+    q = {"answer": ["Monday", "星期一"], "kind": "contains", "distractors": ["Tuesday", "星期二", "Sunday"]}
+    assert grade(q, "Monday") and grade(q, "星期一")
+    assert not grade(q, "Monday Tuesday Sunday") and not grade(q, "星期一或星期二")
+
+
+async def test_speed_bonus_rewards_fast_correct_but_accuracy_dominates(tmp_path):
+    """Speed bonus: only for correct answers, more when faster; but one more correct answer always beats any speed difference."""
+    from arena.modes.base import speed_bonus
+    from arena.types import Action
+
+    def act(elapsed, limit=120.0):
+        return Action(content="x", meta={"elapsed": elapsed, "time_limit": limit})
+
+    assert speed_bonus(act(0)) == 0.5
+    assert speed_bonus(act(60)) == 0.25
+    assert speed_bonus(act(120)) == 0.0 and speed_bonus(act(500)) == 0.0
+    assert speed_bonus(Action(content="x")) == 0.0          # no bonus if elapsed time wasn't measured
+    assert speed_bonus(act(0), cap=0) == 0.0                # speed_bonus: 0 disables it
+    # single question: a correct answer (even at the last moment) always beats a wrong one
+    assert 1 + speed_bonus(act(119.9)) > 0
+    # whole match: speed can make up for one miss (the conversion is documented):
+    # 4 correct at 5 s each ≈ 5.92 points, beats 5 correct averaging 80 s (≈ 5.83), loses to 5 correct averaging 60 s (6.25)
+    fast_four = 4 * (1 + speed_bonus(act(5)))
+    assert fast_four > 5 * (1 + speed_bonus(act(80)))
+    assert fast_four < 5 * (1 + speed_bonus(act(60)))
+
+
+def test_speed_bonus_config_validated():
+    import pytest
+    from arena.modes.quiz import QuizMode
+    for bad in (1, 1.5, -0.1, True, "0.5"):
+        with pytest.raises(ValueError):
+            QuizMode({"questions": [{"prompt": "p", "answer": "a"}], "speed_bonus": bad})
+    assert QuizMode({"questions": [{"prompt": "p", "answer": "a"}], "speed_bonus": 0}).speed_cap == 0.0

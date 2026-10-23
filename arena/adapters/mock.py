@@ -1,4 +1,4 @@
-"""Mock adapter：腳本化輸出，給離線測試與對照組用。不連任何外部服務。"""
+"""Mock adapter: scripted output for offline tests and control groups. Connects to no external service."""
 
 from __future__ import annotations
 

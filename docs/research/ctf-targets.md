@@ -1,26 +1,26 @@
-# 免費開源靶機來源（2026-10-22）
+# Free open-source CTF target sources (2026-10-22)
 
-資安場的靶機全部可用「免費開源」映像，兩大來源：
+Every target for the security arena can be a free, open-source image. There are two main sources:
 
-## OWASP VWAD（Vulnerable Web Applications Directory）
-目錄站 https://vwad.owasp.org/ ——合法安全測試/訓練用的已知脆弱應用登錄，分 offline / containerized / online。常用且有 Docker 映像：
+## OWASP VWAD (Vulnerable Web Applications Directory)
+Directory site https://vwad.owasp.org/ is a registry of known-vulnerable applications meant for legitimate security testing and training, split into offline / containerized / online. Common ones with Docker images:
 
-| 應用 | 映像 | 說明 |
+| App | Image | Notes |
 |---|---|---|
-| OWASP Juice Shop | `bkimminich/juice-shop` | Node，涵蓋 OWASP Top 10 |
-| DVWA | `vulnerables/web-dvwa` | PHP，難度可調 |
+| OWASP Juice Shop | `bkimminich/juice-shop` | Node, covers the OWASP Top 10 |
+| DVWA | `vulnerables/web-dvwa` | PHP, adjustable difficulty |
 | OWASP WebGoat | `webgoat/webgoat` | Java |
-| bWAPP | `raesene/bwapp` | PHP/MySQL，100+ web bugs |
+| bWAPP | `raesene/bwapp` | PHP/MySQL, 100+ web bugs |
 
 ## vulhub
-https://github.com/vulhub/vulhub ——開源、預建的 dockerized 脆弱環境大全，用 docker-compose 重現大量 CVE（ActiveMQ 反序列化、Jolokia RCE、Spring 授權繞過、Django SQLi…）。社群工具 `vuln-runner` 可列舉/啟停且避免埠衝突。適合當 ctf 題庫的進階來源。
+https://github.com/vulhub/vulhub is a large open-source collection of prebuilt, dockerized vulnerable environments that use docker-compose to reproduce many CVEs (ActiveMQ deserialization, Jolokia RCE, Spring authorization bypass, Django SQLi, …). The community tool `vuln-runner` can list, start and stop them while avoiding port conflicts. A good advanced source for the ctf question pool.
 
-## 接法與安全邊界
-- 這些映像加進 `targets/allowlist.yaml`（G1 白名單）即可被 `ctf` 模式拉起。
-- **真正脆弱的 OSS 映像（kind=oss）只走 `local`（本機 Docker 隔離私有）**，不得用 freehost 公開上網——公開一台真能被打的箱子同時踩平台 ToS 與安全線（見 SAFETY.md）。
-- **免費空間公開（freehost / Cloudflare tunnel）只給自架 benign 靶機**（arena-warmup，只吐假 flag）。
-- vulhub 多為 docker-compose（多容器），目前 provisioner 支援單一映像；多容器 compose 靶機為後續工作。
+## How to wire them in, and the safety boundary
+- Adding these images to `targets/allowlist.yaml` (the G1 allowlist) lets the `ctf` mode start them.
+- **Truly vulnerable OSS images (kind=oss) only go through `local` (private, isolated local Docker)**. They must not be put online through freehost: publishing a box that can actually be attacked breaks both the platform ToS and our safety line (see SAFETY.md).
+- **Public free hosting (freehost / Cloudflare tunnel) is only for self-hosted benign targets** (arena-warmup, which only returns a fake flag).
+- vulhub is mostly docker-compose (multiple containers), and the provisioner currently supports a single image. Multi-container compose targets are future work.
 
-## 來源
-- OWASP VWAD：https://vwad.owasp.org/
-- vulhub：https://github.com/vulhub/vulhub
+## Sources
+- OWASP VWAD: https://vwad.owasp.org/
+- vulhub: https://github.com/vulhub/vulhub

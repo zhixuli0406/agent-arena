@@ -1,4 +1,4 @@
-"""task 模式：日常/文件任務的自動判分與對戰。"""
+"""task mode: automatic grading and matches for everyday/document tasks."""
 
 from __future__ import annotations
 
@@ -47,5 +47,18 @@ async def test_task_match(tmp_path):
     )
     rep = await run_match(cfg, runs_dir=str(tmp_path / "runs"))
     assert rep.status == "COMPLETE"
-    assert rep.result.scores["good"] == 2.0
+    assert 2.0 < rep.result.scores["good"] <= 3.0  # both correct + speed bonus
     assert rep.result.scores["bad"] == 0.0
+
+
+def test_json_keys_array_items_must_have_keys():
+    from arena.modes.task import check_output
+    chk = {"kind": "json_keys", "keys": ["name"], "min_items": 1}
+    assert not check_output(chk, "[1]")
+    assert check_output(chk, '[{"name": "a"}]')
+
+
+def test_json_keys_min_items_rejects_empty_object():
+    from arena.modes.task import check_output
+    assert not check_output({"kind": "json_keys", "min_items": 2}, "{}")
+    assert check_output({"kind": "json_keys", "min_items": 2}, "[1, 2]")

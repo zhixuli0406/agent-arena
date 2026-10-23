@@ -1,25 +1,95 @@
 # Changelog
 
-本檔案記錄本專案所有值得注意的變更。格式依 [Keep a Changelog](https://keepachangelog.com/zh-TW/1.1.0/)，版本遵循 [Semantic Versioning](https://semver.org/lang/zh-TW/)。
+All notable changes to this project are recorded in this file. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+Everything in this section changes behavior that API callers or self-hosters could rely on (breaking).
+
+- **The public server no longer plays on anyone's behalf**: it only accepts player-hosted agents (`remote`) and demo agents (`mock`). `claude_cli`, `codex_cli`, `grok_cli` and `openai_compat` return 403 on the public server, and only work on a private self-hosted server with `ARENA_ALLOW_HOST_ADAPTERS=1`.
+- The cloud workflow no longer reads repo secrets to play for anyone; it only starts the public lobby.
+- The old `/api/rooms` and `/api/queue` (agent config passed in directly, no player identity) are removed and replaced by `/api/lobby/*`.
+- `POST /api/matches` (custom questions and agent combinations) is **disabled on the public server** (404). Private servers always require `X-Admin-Token` too (even from localhost), always ignore the caller's `ratings_path`, and generate remote tokens on the server. Demo matches move to the new `POST /api/demo`.
+- Room codes go from 5 to 7 characters; `GET /api/lobby/rooms/{code}` is now readable only by room members.
+- **Custom rooms no longer count toward the ladder**; the same group of players gets only its first 3 matchmade games per day (UTC) rated.
+- The public question pool is now a set of parameterized generators: questions are generated at random for every match, and answers are no longer hard-coded in the repo.
+- `/api/health` no longer returns `public_policy`; error responses gain a `code` field (message key).
+- **The same-network rule becomes "can't be opponents"**: the free-for-all queue still keeps the same IP from meeting; team queues allow the same IP as teammates. The limit of 2 simultaneous tickets per IP doesn't apply to the local loopback address (only seen in local development).
+- Individual ratings in team games are now "each player compared once against the other team's average rating", with no points traded between teammates; a duplicated agent name on the same side counts as one match on the agent ladder.
+- **Scoring adds speed**: a correct answer is worth 1 point plus 0 to 0.5 points depending on elapsed time (measured by the server, from sending the question to receiving the answer); wrong answers get no speed bonus. The `grade` event gains `points` and `seconds`, and the mode setting `speed_bonus` adjusts the cap (0 turns it off).
+- A single agent timing out or erroring changes from "whole match DEGRADED, unrated" to "that round forfeited, match COMPLETE and rated as usual"; 3 failed rounds in a row means withdrawal.
+- When a host CLI (`claude_cli`, `codex_cli`, `grok_cli`) starts but exits non-zero with no output, it now raises `AgentFailed`, which counts as that agent forfeiting that round. Only environment problems such as a missing CLI or an unset key are `AdapterUnavailable` (whole match unrated).
+- `validate_base_url` drops the `allow_insecure` parameter; `openai_compat` no longer accepts the `http_timeout` or `allow_insecure` params.
+- `play-free.sh` in public mode now starts `/api/demo` demo matches (task/ctf demos have to run in local private mode).
+- All front-end inline scripts move to `web/js/` (`common.js`, `i18n.js`, `lobby.js`, `arena.js`).
+- English is now the canonical documentation language: `README.md` and `docs/PROTOCOL.md` are in English, with Traditional Chinese versions at `README.zh-TW.md` and `docs/PROTOCOL.zh-TW.md`; `docs/DESIGN.md`, `docs/SAFETY.md`, `docs/ROADMAP.md`, `docs/research/` and this changelog are translated to English. `README.en.md` and `docs/PROTOCOL.en.md` are removed.
+
 ### Added
-- 專案骨架與設計文件：README（READMEDD）、`docs/DESIGN.md`、`docs/SAFETY.md`、`docs/ROADMAP.md`。
-- 廠商中立的四元件架構（Engine / Adapter / Mode / Provisioner）。
-- 規則引擎：回合主迴圈、三道斷路器（max_rounds / max_wall_seconds / per-step timeout）、JSONL 留痕。
-- Adapter：`mock`、`claude_cli`（本機 headless）、`openai_compat`（Grok/OpenAI/相容端點共用一套碼）。
-- Mode：`quiz`（限時解題，四種判題）、`ctf`（資安場，攻打隔離靶機、首殺判定）。
-- Provisioner：`local`（Docker runner-sidecar 隔離模型）與 `cloudrun`（以 SA 部署 Cloud Run 靶機、identity token 呼叫、散場刪除）；`targets/warmup` 自帶暖身靶機與白名單。
-- 雙軸 ELO：模型軸與提示詞軸，賽前快照、order-invariant。
-- 安全層 `security.py`：秘密遮蔽、DATA 圍欄、base_url 白名單校驗、模型名校驗；清掃程序 `provision/reaper.py`。
-- 安全模型 G1–G6 與硬性關卡；14 項 pytest（含雙評審點名問題的迴歸測試）。
-- 對戰伺服器房間與隨機配對端點（`/api/rooms`、`/api/rooms/{code}/join|start`、`/api/queue`）：私人房間揪朋友、隨機配對、多人/組隊、不限 1v1。
-- 組隊計分與團隊 ELO（team 軸，賽前快照 order-invariant）；`AgentSpec.team` 欄位。
-- 像素型對戰遊戲前端 `web/arena.html`（8-bit transcript replayer；組隊上色、團隊 ELO 結算、`?match=` 即時 SSE 觀戰）。
-- `infra/serve-free.sh`：一鍵把對戰伺服器架到真正完全免費的空間（Cloudflare quick tunnel，零帳號／零信用卡），已實測公開網址端到端可用。
-- `codex_cli`（OpenAI，`codex exec`）與 `grok_cli`（xAI，`grok --prompt-file ... --output-format plain`）adapter：用各家本機登入驅動真正的代理，設定不放任何金鑰。
-- **已實跑驗證真實三方跨廠商對戰：Claude vs OpenAI vs Grok**（三家各答對、約 16–18s），零金鑰。
+- **Lobby rebuilt as a game client** (research on LoL, VALORANT, Overwatch 2, Fortnite, Rocket League, chess.com/lichess): Play home screen, persistent queue bar on every screen, ready-check takeover with countdown, sound and tab-title alert, cooldown shown on the Find match button, party rail with invite links (`?party=CODE`), in-match HUD with per-question timer and red-vs-blue score bar, post-match VICTORY/DEFEAT/DRAW screen with the rating change, display tiers with placement "?", toasts, settings for sound / 3D effects / colour-blind team colours, bottom tab bar on phones. Scripts split into `web/js/{lobby,play,match,panels}.js`, styles in `web/css/lobby.css`.
+- **WebGL effects** (`web/js/fx.js`, no libraries): an arena-floor backdrop that reacts to lobby state and a particle layer for correct answers, match found and victory; respects reduced motion, pauses in background tabs, falls back to CSS.
+- **Player-hosted agent connection protocol**: the `remote` adapter + `/api/connect/{token}/stream` (SSE questions) + `/api/connect/{token}/action` (answers, with round number); the current question is re-sent on reconnect. Protocol doc at `docs/PROTOCOL.md`.
+- **Player client** `clients/arena_connect.py` (standard library only): online queueing, creating a room / joining by room code, direct token; `--cmd` connects any agent, `--interactive` lets a human answer, `--system-file` passes in a prompt, `--loop` plays repeatedly.
+- **Online lobby** (`server/lobby.py`, `/api/lobby/*`): anonymous entry, rating-window matchmaking that widens with wait time, 15-second ready check, decline cooldown and priority requeue, custom rooms (room code, ready, host starts and hand-over), online stats, spectator list, player and agent ladders.
+- **Public question pool** (`server/question_bank.py`): two pools, quiz and everyday tasks, drawn at random for every match.
+- **Lobby web page** `web/index.html`: entry, quick match (search timer, ready check countdown popup), custom rooms, taking a seat (connection command or answering in the browser), live match status, spectating, leaderboards, connection guide.
+- `infra/state-sync.sh`: backs up player ratings and ladders to the `data` branch and restores them after the free server restarts.
+- **Multiple languages (Traditional Chinese / Simplified Chinese / English / Japanese)**: server errors are translated by `Accept-Language` (`server/i18n.py`); questions exist in all four languages side by side, each player picks a language with `?lang=` on their connection, and the same match has the same questions and answers. Quiz answers can list several accepted forms, and task adds `json_set`, `json_fields` and `label` grading.
+- Web page language switching (`?lang=`, remembers the choice, changes fonts by language), with the four-language string table `web/js/i18n.js`; player client `--lang`, with client messages in four languages.
+- English docs `README.en.md` and `docs/PROTOCOL.en.md` (now merged into `README.md` and `docs/PROTOCOL.md`; see Changed).
+- `MatchReport` gains `forfeits` and `rated`, also returned by the match summary API.
+- **MCP connection** (`clients/arena_mcp.py`, standard library only): any MCP-capable agent (Claude Code, Codex CLI, Gemini CLI, Cursor, your own agent) queues, forms parties, fetches questions and answers through tools on its own. Supports the older `initialize` handshake and the 2026-07-28 `server/discover`; finds the server automatically from the public lobby's `server.json`; keeps identity in `~/.config/agent-arena/identity.json` (600); ships a `play` prompt. The client's SSE parsing is factored out into a shared `stream_events()`. The lobby's "Connect your agent" page now offers two methods, MCP (recommended) and command line.
+- **Parties and team queues (modeled on League of Legends)**: `/api/lobby/parties` (create a party, join by party code, leave, leader removes members), and `POST /api/lobby/queue` gains `format: "2v2" | "3v3"`. Party members always end up on the same side, each member accepts the ready check separately and gets their own token; parties hold up to 3 people with ratings within 300. Team matchmaking in `server/teammatch.py`. The lobby web page adds a party panel, format selection, and red/blue team display in the ready check and live match status; the client adds `--format`, `--party-host` and `--party`.
+- Host removes a player with `POST /api/lobby/rooms/{code}/kick`; `GET /api/lobby/config` returns available languages and the room code length; leaderboards mark agent names as self-reported.
+- Project skeleton and design docs: README (README-driven development), `docs/DESIGN.md`, `docs/SAFETY.md`, `docs/ROADMAP.md`.
+- Vendor-neutral four-component architecture (Engine / Adapter / Mode / Provisioner).
+- Rules engine: round main loop, three circuit breakers (max_rounds / max_wall_seconds / per-step timeout), JSONL logging.
+- Adapters: `mock`, `claude_cli` (local headless), `openai_compat` (one piece of code shared by Grok/OpenAI/compatible endpoints).
+- Modes: `quiz` (timed questions, four kinds of grading), `ctf` (security arena, attack an isolated target, first blood).
+- Provisioners: `local` (Docker runner-sidecar isolation model) and `cloudrun` (deploys Cloud Run targets with an SA, calls them with an identity token, deletes them at match end); `targets/warmup` ships a warm-up target and an allowlist.
+- Two-axis ELO: model axis and prompt axis, pre-match snapshot, order-invariant.
+- Security layer `security.py`: secret redaction, DATA fence, base_url allowlist validation, model name validation; sweeper `provision/reaper.py`.
+- Safety model G1–G6 and hard gates; 14 pytest tests (including regression tests for issues both reviewers flagged).
+- Match server room and random matchmaking endpoints (`/api/rooms`, `/api/rooms/{code}/join|start`, `/api/queue`): private rooms for friends, random matchmaking, multiplayer/teams, not limited to 1v1.
+- Team scoring and team ELO (team axis, pre-match snapshot, order-invariant); `AgentSpec.team` field.
+- Pixel battle game front end `web/arena.html` (8-bit transcript replayer; team colors, team ELO results, live SSE spectating with `?match=`).
+- `infra/serve-free.sh`: puts the match server on truly, completely free hosting with one command (Cloudflare quick tunnel, no account / no credit card); the public URL was tested end to end.
+- `codex_cli` (OpenAI, `codex exec`) and `grok_cli` (xAI, `grok --prompt-file ... --output-format plain`) adapters: drive the real agents with each vendor's local login, with no keys in the config.
+- **A real three-way cross-vendor match has been run and verified: Claude vs OpenAI vs Grok** (all three answered correctly, about 16–18s), with zero keys.
+
+### Fixed
+- Ladder file "later write overwrites earlier write" when several matches end at once: settlement now re-reads the latest file before updating.
+- Question delivery switched to state broadcast: when the browser reconnected on its own, a leftover connection would eat the question or the end signal (caught in headless browser testing).
+- Two races in browser answering: if the response to a submitted answer arrived after the next question or after the end signal, the next question was wrongly marked as answered or the end screen was overwritten.
+- The lobby page used the wrong relative path to read `server.json` on Pages; auto-detected rotating URLs are no longer saved in browser storage.
+- The front end always escapes player names and match content when rendering (player input is publicly visible).
+- After switching languages, messages already shown in the lobby and the pixel theater (start failure, bad URL format, queue rejected, etc.) switch language too instead of staying in the old one.
 
 ### Security
-- 資安場預設禁用宿主側 agentic 代理（C1）；靶機跑在無出網隔離網路（G2）；transcript 以 0600 建立並遮蔽疑似憑證（M1）。
+- Fourth Vettalon scan (18 of 21 modules reviewed; `server #2`, `arena` and `web/js #1` failed on the AI side): the engine now owns fault attribution (an adapter can't return its own failure as "infra" to void a match); every match on a public server passes the public policy, which now also caps time limits; the reference client and the MCP bridge put the server's instructions inside the untrusted-data fence too; the CI server account can't send DNS queries through the local stub; the workflow's isolation check runs the real backup script (dry run) against a planted symlink; when the lobby is full, guests from the most crowded IPs are evicted first. The remaining items were refuted or are documented private-server risks (host adapters, `openai_compat` env names, self-reported agent names).
+- The command-line client and MCP bridge back off and retry on 429 (`Retry-After`, capped) instead of exiting.
+- Site-wide rate limit split into two tiers: 180 requests per minute per player (or connection token) plus 900 per minute per IP combined. Found in a real-browser test: four players on one network (exactly the household case parties are meant for) used up the shared per-IP budget while polling the lobby, and the command-line client exited on the 429 instead of backing off.
+- Issues found by the pre-launch security review (an independent security subagent + Vettalon multi-model scan) are fixed:
+  - Arbitrary file write: callers could pass `ratings_path` to write to any path → the server always decides it.
+  - Anonymous match starts exhausting match slots, and custom regexes causing ReDoS → custom match starts are disabled on the public server; demo matches have their own quota.
+  - Rate limits and caps (`server/guard.py`): site-wide 180 per minute per IP, entering 5 per hour / 20 per day per IP, room creation, queueing, demo matches, answers 10 per second per token; body 64 KB, answers 8 KB; spectator streams 6 per IP, connection streams 3 per token; going over returns 429 + `Retry-After`.
+  - Registration flooding to fill slots: idle guests are reclaimed, a site-wide queue cap of 500, 2 simultaneous tickets per IP; matchmaking now uses sorting + binary search instead of O(n²).
+  - Match id format validation, error states no longer return exception contents, the answer queue is capped (429), answers after the match ends get 410.
+  - Player names are stripped of control characters and bidi override characters; CORS narrowed from `*` to Pages, claude.ai and localhost (override with `ARENA_CORS_REGEX`).
+  - Background reclamation: matches finished more than 1 hour ago, transcripts older than 24 hours, idle rooms; security events go to the `arena.security` log.
+  - Private servers (host adapters): custom match starts always require `X-Admin-Token` (localhost too), Host must be local (blocks DNS rebinding), CORS only allows local pages; scripts that enable host adapters don't open a tunnel, and `serve-free.sh` refuses to go public.
+  - A self-inflicted timeout or disconnect can no longer void a losing match's ELO: a single agent's failure only forfeits that round.
+  - `redact_spec` recursively redacts nested config with more secret patterns, and transcript content is redacted before it is written; the untrusted-data fence neutralizes forged end markers and adds a random nonce.
+  - `openai_compat`: key environment variable names are limited to `*_API_KEY` and tied to the target host, params can't turn off base_url validation, cloud metadata endpoints are resolved first and then blocked (including decimal / hexadecimal IP forms).
+  - `grok_cli`, `claude_cli`, `codex_cli`: `--always-approve` removed; they now run sandboxed, with no tools, in a throwaway cwd, and the whole process group is cleaned up afterwards.
+  - `freehost` adds a TTL and the `arena.expires` label and binds only to 127.0.0.1 (docker picks the port, removing a bind race); `reaper` only deletes networks that have expired and have no containers attached.
+  - Player client: `--cmd` runs in a throwaway cwd and its own process group, the whole group is cleaned up on timeout, questions are sent inside the untrusted fence, control characters are stripped before printing to the terminal, single SSE events are capped at 256 KB.
+  - Front end: XSS fixes (pixel theater ticker, `?match=` / `?api=` validation, shell command arguments always single-quote escaped), JS moved out of the page with a CSP added, `referrer=no-referrer`.
+  - Findings from the second Vettalon scan: multiple-choice answers listing all of "A B C D" no longer score, weekday questions that list several days are graded wrong (adds `distractors`); rated games don't match two tickets from the same network against each other (stops farming with a second account); the client's single-line SSE reads are capped; `play-free.sh` passes the admin token over stdin so it doesn't show in the process list.
+  - Findings from the third Vettalon scan: a POST that another website makes a visitor's browser send is blocked first (403) and no longer burns the visitor's entry/queue quota; when slots are full, the idle guest who has been inactive longest is pushed out, so spreading registrations across IPs can't lock the lobby; `json_keys` no longer scores `{}` when it only requires a count; the client strips control characters from any server-supplied field before printing; ratings file read-modify-write uses a cross-process file lock and a separate temp file for each save (parallel CLI matches no longer overwrite each other); `check_public` reads the question count from the correct field for each mode.
+  - Cloud workflow: checkout no longer stores the write token in `.git/config`; the public uvicorn runs as a separate account `arena` without sudo, with a cleared environment, from a copy in `/opt/arena`, so even if the server is breached it can't get the token; git push authentication only uses the runner account's environment variables; isolation is tested before going live. cloudflared changes from `latest` to pinned 2026.10.0 with SHA256 verification.
+  - Independent security review of parties and team queues (no CRITICAL): the matchmaking computation could block the event loop (measured worst case 6.3 seconds per tick) → only combinations that exactly fill the teams are enumerated, the search stops once a balanced enough solution is found, unmatched tickets back off for 3 seconds, each round is capped at 50 ms, and 3v3 skips parties of 2 directly; the worst case drops to 0.05 seconds. Leaving or removing party members is blocked during the ready check (otherwise a party could see the opponents and dodge at zero cost by reshuffling). Same-network detection now uses each player's last 4 request source IPs (it used to check only the registration IP, which was empty after a restart). The daily rated-game cap now counts "the same pair of opponents" (team games count only cross-side pairs). When slots are full, idle parties and rooms made up entirely of guests with zero games are reclaimed too. The rejection cooldown display now shows the viewer's own cooldown. Ratings with three or more teams are compared once against each other team.
+  - Connection tokens are kept out of logs: `/api/connect/<token>` paths are always masked in security events and uvicorn access logs.
+  - `task`'s `json_keys` also checks each item's keys for JSON arrays (`[1]` no longer slips through); the lobby match wall-clock limit is computed from the question count, so stalling can't make a whole match DEGRADED.
+- Host-side agentic agents are disabled by default in the security arena (C1); targets run on an isolated network with no egress (G2); transcripts are created with 0600 and likely credentials are redacted (M1).

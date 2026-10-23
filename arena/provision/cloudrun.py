@@ -1,14 +1,14 @@
-"""Cloud Run 配置器：把靶機部署成 GCP Cloud Run 服務（免費額度，用完即刪）。
+"""Cloud Run provisioner: deploys the target as a GCP Cloud Run service (free tier, deleted after use).
 
-一律用 Service Account（金鑰由 ARENA_GCP_SA_KEY 指定），絕不請使用者互動登入；
-遇 IAM_PERMISSION_DENIED 即越界訊號，停工回報不繞過（G6）。
+Always uses a Service Account (key given by ARENA_GCP_SA_KEY) and never asks the user for an interactive login;
+IAM_PERMISSION_DENIED is a sign of overstepping, so stop and report instead of working around it (G6).
 
-v0 安全邊界：
-- 只接受白名單中 kind=self 的自架靶機（OSS 靶機在 Cloud Run 的出網控制尚未就緒，拒絕）。
-- 預設 --no-allow-unauthenticated：靶機不公開，引擎以 SA 身分權杖呼叫。
-- 用完即 delete（散場 teardown + 可配 TTL 由外部清掃）。
-注意：Cloud Run 服務預設可對外出網，故 G2「封閉出網」在 Cloud Run 上尚未完全成立——
-這是只收 self（inert）靶機的原因；要上 OSS 靶機須先補 VPC egress 控制。
+v0 security boundary:
+- Only accepts allowlisted self-hosted targets with kind=self (OSS targets are rejected: egress control on Cloud Run isn't ready).
+- --no-allow-unauthenticated by default: the target isn't public and the engine calls it with an SA identity token.
+- Deleted after use (teardown at match end + configurable TTL cleaned up externally).
+Note: Cloud Run services can reach the internet by default, so G2 "no egress" doesn't fully hold on Cloud Run yet.
+That is why only self (inert) targets are accepted; OSS targets need VPC egress control first.
 """
 
 from __future__ import annotations
@@ -69,32 +69,32 @@ class CloudRunProvisioner(Provisioner):
         from .local import _DEFAULT_ALLOWLIST
 
         self.allowlist = _load_allowlist(allowlist_path or os.environ.get("ARENA_ALLOWLIST", _DEFAULT_ALLOWLIST))
-        # GCP 設定一律由環境變數提供，不把專案/SA 細節寫進原始碼（本 repo 可公開）
+        # GCP settings always come from env vars; project/SA details stay out of the source (this repo can be public)
         self.region = os.environ.get("ARENA_GCP_REGION", "asia-east1")
         self.project = os.environ.get("ARENA_GCP_PROJECT", "")
         self.sa_key = os.environ.get("ARENA_GCP_SA_KEY", "")
         self.sa_email = os.environ.get("ARENA_GCP_SA_EMAIL", "")
 
     async def provision(self, target: TargetSpec, match_id: str, ttl_seconds: int = 1800) -> Sandbox:
-        # G1 白名單；cloudrun v0 僅收自架 self 靶機
+        # G1 allowlist; cloudrun v0 only accepts self-hosted self targets
         meta = self.allowlist.get(target.image)
         if meta is None:
-            raise PermissionError(f"G1 拒絕：映像 {target.image!r} 不在白名單")
+            raise PermissionError(f"G1 rejected: image {target.image!r} is not on the allowlist")
         if meta.get("kind") != "self":
-            raise PermissionError("cloudrun v0 僅支援自架 self 靶機（OSS 靶機的出網控制未就緒）")
+            raise PermissionError("cloudrun v0 only supports self-hosted self targets (egress control for OSS targets isn't ready)")
 
-        # G4 祕密掃描
+        # G4 secret scan
         for k, v in (target.env or {}).items():
             if k != "FLAG" and looks_secret(str(v)):
-                raise PermissionError(f"G4 拒絕：環境變數 {k} 的值疑似真實憑證")
+                raise PermissionError(f"G4 rejected: the value of env var {k} looks like a real credential")
 
         if not self.project:
-            raise RuntimeError("cloudrun 需要設定 ARENA_GCP_PROJECT 環境變數")
-        # 依 gcp-deploy 規範啟用 SA（有金鑰才啟用，否則用環境既有認證；絕不請使用者互動登入）
+            raise RuntimeError("cloudrun requires the ARENA_GCP_PROJECT env var")
+        # activate the SA per the gcp-deploy rules (only if a key is set, otherwise use the existing credentials; never ask for an interactive login)
         if self.sa_key:
             rc, _, err = await _gcloud("auth", "activate-service-account", "--key-file", self.sa_key, timeout=60)
             if rc != 0:
-                raise RuntimeError(f"啟用 SA 失敗：{err.decode(errors='replace')[:200]}")
+                raise RuntimeError(f"activating the SA failed: {err.decode(errors='replace')[:200]}")
 
         service = ("arena-" + match_id).lower()[:63]
         src = os.path.join(_TARGETS_DIR, meta.get("dir", "warmup"))
@@ -113,10 +113,10 @@ class CloudRunProvisioner(Provisioner):
         if rc != 0:
             msg = err.decode(errors="replace")
             if "PERMISSION_DENIED" in msg or "IAM_PERMISSION_DENIED" in msg:
-                raise PermissionError(f"G6 越界（IAM 權限不足，停工回報不繞過）：{msg[:200]}")
-            raise RuntimeError(f"Cloud Run 部署失敗：{msg[:300]}")
+                raise PermissionError(f"G6 out of bounds (insufficient IAM permissions; stopping and reporting, not working around it): {msg[:200]}")
+            raise RuntimeError(f"Cloud Run deploy failed: {msg[:300]}")
 
-        # deploy 已建立服務：後續任一步失敗都要把服務刪掉，避免孤兒服務持續計費（§金流安全）
+        # deploy created the service: if any later step fails, delete it so an orphaned service doesn't keep billing (§billing safety)
         async def _delete_service() -> None:
             await _gcloud(
                 "run", "services", "delete", service,
@@ -131,9 +131,9 @@ class CloudRunProvisioner(Provisioner):
             )
             url = out.decode(errors="replace").strip()
             if rc != 0 or not url:
-                raise RuntimeError(f"取得 Cloud Run URL 失敗：{err.decode(errors='replace')[:200]}")
+                raise RuntimeError(f"getting the Cloud Run URL failed: {err.decode(errors='replace')[:200]}")
 
-            # 授予 SA 對本服務的 invoker（run.admin 範圍內的服務層 IAM），再鑄 identity token
+            # grant the SA invoker on this service (service-level IAM within run.admin), then mint an identity token
             if self.sa_email:
                 await _gcloud(
                     "run", "services", "add-iam-policy-binding", service,
@@ -146,7 +146,7 @@ class CloudRunProvisioner(Provisioner):
 
             sandbox = CloudRunSandbox(service, self.region, self.project, url, id_token)
 
-            # 就緒輪詢（Cloud Run 冷啟動）
+            # readiness polling (Cloud Run cold start)
             for _ in range(30):
                 status, _body = await sandbox.http("GET", "/", timeout=15)
                 if status not in (-1, 500, 502, 503):
@@ -154,5 +154,5 @@ class CloudRunProvisioner(Provisioner):
                 await asyncio.sleep(2)
             return sandbox
         except Exception:
-            await _delete_service()  # best-effort 清理孤兒服務
+            await _delete_service()  # best-effort cleanup of the orphaned service
             raise

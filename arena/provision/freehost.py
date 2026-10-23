@@ -1,7 +1,12 @@
-"""免費空間靶機配置器：Docker 跑靶機 + Cloudflare quick tunnel 公開（零帳號、零信用卡）。
+"""Free-hosting target provisioner: Docker runs the target + a Cloudflare quick tunnel makes it public (no account, no credit card).
 
-把「資安場靶機」也架到免費空間。安全邊界：只收白名單中 kind=self 的自架 benign 靶機
-（暖身靶機只吐假 flag）；真正脆弱的 OSS 映像不得公開，仍留本機私有（見 docs/SAFETY.md）。
+Puts security-match targets on free hosting too. Security boundary: only allowlisted self-hosted benign targets with
+kind=self (the warmup target only hands out a fake flag); truly vulnerable OSS images must not be made public and
+stay local and private (see docs/SAFETY.md).
+
+G3 cleanup: containers carry arena.match / arena.expires labels (the reaper cleans up by them), and an in-process timer tears them down when the TTL expires.
+Binding: the target port is published only on 127.0.0.1 (docker picks a free port, so there's no probe-then-bind race),
+and cloudflared connects to 127.0.0.1 explicitly rather than localhost (so it can't resolve to ::1 and get hijacked by another process binding there).
 """
 
 from __future__ import annotations
@@ -10,7 +15,6 @@ import asyncio
 import os
 import re
 import shutil
-import socket
 import time
 
 from ..security import looks_secret
@@ -20,20 +24,41 @@ from .local import _DEFAULT_ALLOWLIST, _load_allowlist, _run
 _URL_RE = re.compile(rb"https://[-a-z0-9]+\.trycloudflare\.com")
 
 
-def _free_port() -> int:
-    s = socket.socket()
-    s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
-    return port
+_LOOPBACK = "127.0.0.1"
+_BACKGROUND: set[asyncio.Task] = set()
+
+
+def parse_docker_port(output: bytes | str) -> int:
+    """Parse `docker port <c> <p>/tcp` output, accepting only the line bound to 127.0.0.1."""
+    text = output.decode(errors="replace") if isinstance(output, bytes) else output
+    for line in text.splitlines():
+        host, _, port = line.strip().rpartition(":")
+        if host == _LOOPBACK and port.isdigit():
+            return int(port)
+    raise RuntimeError(f"no published port bound to {_LOOPBACK}: {text[:120]!r}")
 
 
 class TunnelSandbox(Sandbox):
-    def __init__(self, base_url: str, container: str, cf_proc: asyncio.subprocess.Process):
+    def __init__(self, base_url: str, container: str, cf_proc: asyncio.subprocess.Process,
+                 ttl_seconds: float | None = None):
         self._base = base_url.rstrip("/")
         self._container = container
         self._cf = cf_proc
         self._down = False
+        self._ttl_handle: asyncio.TimerHandle | None = None
+        # keep draining cloudflared's log after getting the URL, or a full pipe stalls the tunnel
+        self._drain: asyncio.Task | None = (
+            asyncio.ensure_future(_drain(cf_proc.stdout)) if cf_proc is not None and cf_proc.stdout else None
+        )
+        if ttl_seconds and ttl_seconds > 0:
+            # enforce the TTL: even if the match forgets to tear down, the public target is removed when it expires
+            loop = asyncio.get_running_loop()
+            self._ttl_handle = loop.call_later(ttl_seconds, self._ttl_expired)
+
+    def _ttl_expired(self) -> None:
+        task = asyncio.ensure_future(self.teardown())
+        _BACKGROUND.add(task)  # keep a reference so the task isn't garbage-collected midway
+        task.add_done_callback(_BACKGROUND.discard)
 
     @property
     def public_url(self) -> str:
@@ -55,12 +80,36 @@ class TunnelSandbox(Sandbox):
         if self._down:
             return
         self._down = True
-        if self._cf and self._cf.returncode is None:
-            try:
-                self._cf.terminate()
-            except ProcessLookupError:
-                pass
+        if self._ttl_handle is not None:
+            self._ttl_handle.cancel()
+        await _stop_tunnel(self._cf)
+        if self._drain is not None:
+            self._drain.cancel()
         await _run("docker", "rm", "-f", self._container, timeout=30)
+
+
+async def _drain(stream: asyncio.StreamReader) -> None:
+    try:
+        while await stream.readline():
+            pass
+    except Exception:  # noqa: BLE001 — only discarding logs; a failure doesn't affect the match
+        return
+
+
+async def _stop_tunnel(cf: asyncio.subprocess.Process | None) -> None:
+    """terminate first, kill if it doesn't exit, so the public tunnel is always closed."""
+    if cf is None or cf.returncode is not None:
+        return
+    try:
+        cf.terminate()
+        await asyncio.wait_for(cf.wait(), timeout=5)
+    except ProcessLookupError:
+        return
+    except asyncio.TimeoutError:
+        try:
+            cf.kill()
+        except ProcessLookupError:
+            pass
 
 
 class FreeHostProvisioner(Provisioner):
@@ -70,35 +119,44 @@ class FreeHostProvisioner(Provisioner):
     async def provision(self, target: TargetSpec, match_id: str, ttl_seconds: int = 1800) -> Sandbox:
         meta = self.allowlist.get(target.image)
         if meta is None:
-            raise PermissionError(f"G1 拒絕：映像 {target.image!r} 不在白名單")
+            raise PermissionError(f"G1 rejected: image {target.image!r} is not on the allowlist")
         if meta.get("kind") != "self":
-            raise PermissionError("免費空間公開靶機僅限自架 benign self 靶機；真正脆弱映像請用 local 留本機私有（SAFETY.md）")
+            raise PermissionError("public targets on free hosting are limited to self-hosted benign self targets; use local for truly vulnerable images and keep them private (SAFETY.md)")
         for k, v in (target.env or {}).items():
             if k != "FLAG" and looks_secret(str(v)):
-                raise PermissionError(f"G4 拒絕：環境變數 {k} 疑似真實憑證")
+                raise PermissionError(f"G4 rejected: env var {k} looks like a real credential")
         if shutil.which("cloudflared") is None:
-            raise RuntimeError("需要 cloudflared（brew install cloudflared）")
+            raise RuntimeError("cloudflared is required (brew install cloudflared)")
         rc, _, err = await _run("docker", "version", "--format", "{{.Server.Version}}", timeout=15)
         if rc != 0:
-            raise RuntimeError(f"docker 不可用：{err.decode(errors='replace')[:120]}")
+            raise RuntimeError(f"docker unavailable: {err.decode(errors='replace')[:120]}")
 
         port = int(meta["port"])
-        hostport = _free_port()
         name = f"arena-tgt-{match_id}"
+        expires = int(time.time()) + int(ttl_seconds)
+        labels = ["--label", f"arena.match={match_id}", "--label", f"arena.expires={expires}"]
         hard = ["--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", "256", "--memory", "512m"]
         env_args: list[str] = []
         for k, v in (target.env or {}).items():
             env_args += ["-e", f"{k}={v}"]
 
         rc, _, err = await _run(
-            "docker", "run", "-d", "--name", name, "-p", f"127.0.0.1:{hostport}:{port}", *hard, *env_args, target.image,
-            timeout=120,
+            "docker", "run", "-d", "--name", name, "-p", f"{_LOOPBACK}::{port}", *labels, *hard, *env_args,
+            target.image, timeout=120,
         )
         if rc != 0:
-            raise RuntimeError(f"啟動靶機失敗：{err.decode(errors='replace')[:160]}")
+            raise RuntimeError(f"starting the target failed: {err.decode(errors='replace')[:160]}")
+        rc, out, err = await _run("docker", "port", name, f"{port}/tcp", timeout=15)
+        try:
+            if rc != 0:
+                raise RuntimeError(f"querying the published port failed: {err.decode(errors='replace')[:120]}")
+            hostport = parse_docker_port(out)
+        except Exception:
+            await _run("docker", "rm", "-f", name)
+            raise
 
         cf = await asyncio.create_subprocess_exec(
-            "cloudflared", "tunnel", "--url", f"http://localhost:{hostport}", "--no-autoupdate",
+            "cloudflared", "tunnel", "--url", f"http://{_LOOPBACK}:{hostport}", "--no-autoupdate",
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
         )
         url: str | None = None
@@ -115,15 +173,12 @@ class FreeHostProvisioner(Provisioner):
                 url = m.group().decode()
                 break
         if not url:
-            try:
-                cf.terminate()
-            except ProcessLookupError:
-                pass
+            await _stop_tunnel(cf)
             await _run("docker", "rm", "-f", name)
-            raise RuntimeError("cloudflared 取得公開網址逾時")
+            raise RuntimeError("timed out waiting for cloudflared's public URL")
 
-        sandbox = TunnelSandbox(url, name, cf)
-        for _ in range(30):  # 等靶機就緒（經公開網址）
+        sandbox = TunnelSandbox(url, name, cf, ttl_seconds=ttl_seconds)
+        for _ in range(30):  # wait for the target to be ready (via the public URL)
             status, _body = await sandbox.http("GET", "/", timeout=10)
             if status not in (-1, 502, 503):
                 break

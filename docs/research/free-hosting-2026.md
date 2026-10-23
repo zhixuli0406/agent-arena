@@ -1,49 +1,49 @@
-# 真正完全免費架站方案（2026-10-22）
+# Truly free hosting options (2026-10-22)
 
-> 使用者要求免費架站要「真正完全免費（免信用卡、不會計費）」。
-> 本文由主執行緒查證補寫——原規劃的深度研究子代理被 session 用量上限（429，台北 12am 重置）中斷。
-> 標示：✅=官方頁面確認、⚠️=僅二手來源/有衝突、❓=未確認。深度 ToS 逐條查證待限制重置後補。
+> The user asked for free hosting that is "truly, completely free (no credit card, never billed)".
+> This document was checked and written by the main thread after the planned deep-research subagent was cut off by the session usage limit (429, resets at 12am Taipei time).
+> Markers: ✅ = confirmed on the official page, ⚠️ = secondhand sources only or conflicting, ❓ = unconfirmed. A clause-by-clause ToS check is still to be done after the limit resets.
 
-## 一個關鍵判斷：靶機不該上公開免費 host
+## One key judgment: targets don't belong on public free hosts
 
-把「故意留洞的 CTF 靶機」部署到任何共享免費 PaaS 有兩個問題：
+Deploying "deliberately vulnerable CTF targets" to any shared free PaaS has two problems:
 
-1. **ToS 風險**：多數平台禁止 host「intentionally vulnerable / exploit / malware」類內容。
-2. **安全風險**：公開可達的脆弱容器＝真的能被任何人打的箱子，違背 docs/SAFETY.md 的隔離精神。
+1. **ToS risk**: most platforms forbid hosting "intentionally vulnerable / exploit / malware" content.
+2. **Security risk**: a publicly reachable vulnerable container is a box that anyone can actually attack, which goes against the isolation principle in docs/SAFETY.md.
 
-所以建議的架構分工：
+So the suggested split is:
 
-- **對戰伺服器（無害 web 服務）** → 上「免信用卡」免費 PaaS。
-- **CTF 靶機** → 預設留在**本機 Docker**（已實作、本就完全免費且網路隔離）。雲端靶機只在「私有 require-auth＋ToS 允許」的前提下才考慮，列為進階/延後。
+- **Match server (a harmless web service)** → a free PaaS that needs no credit card.
+- **CTF targets** → stay on **local Docker** by default (already implemented, completely free, and network isolated). Cloud targets are only considered when they can be "private, require-auth, and allowed by the ToS", and are marked advanced/deferred.
 
-這樣「免費自動架設伺服器」成立，又不踩 ToS/安全雷。
+That way "free automatic server hosting" works without running into ToS or safety problems.
 
-## 候選比較（對戰伺服器用途）
+## Candidate comparison (for the match server)
 
-| 平台 | 免信用卡 | 任意 Docker | API/CLI 佈建 | 免費限制 | 一手來源 |
+| Platform | No credit card | Any Docker | API/CLI provisioning | Free tier limits | Primary source |
 |---|---|---|---|---|---|
-| **Render（free web service）** | ✅ 官方 pricing 確認 | ✅（支援 Docker） | ⚠️ 有 REST API 與 render.yaml，免費層細節未逐一確認 | 512MB/0.1CPU、750hr/月、15 分無流量休眠、~1 分冷啟 | render.com/pricing |
-| **Back4App Containers** | ✅ 官方確認 | ✅ 自訂 Docker | ❓ CLI/API 未確認 | 0.25CPU/256MB；免費容器疑每次僅 60 分/deploy（⚠️ 二手，未一手確認） | back4app.com/pricing/container-as-a-service |
-| **Hugging Face Spaces（Docker）** | ✅ 註冊免卡 | ✅ Docker SDK | ✅ `HfApi.create_repo(space_sdk=docker)` | ⚠️ 論壇報 Docker Space 可能已需 PRO（付費）；出網僅 80/443/8080；閒置休眠 | discuss.huggingface.co（未一手確認） |
-| **Fly.io** | ❌ 新戶需卡 | ✅ | ✅ | 已非免費 | — |
-| **Koyeb** | ⚠️ 疑需卡/預設付費 | ✅ | ✅ | 1 service、scale-to-zero | koyeb.com/pricing（衝突） |
-| **Cloud Run** | ❌ 需綁卡 | ✅ | ✅ | 免費額度內不計費但**非完全免費** | （本專案已有 cloudrun provider，列選項） |
+| **Render (free web service)** | ✅ confirmed on official pricing | ✅ (supports Docker) | ⚠️ has a REST API and render.yaml; free tier details not checked one by one | 512MB/0.1CPU, 750hr/month, sleeps after 15 min with no traffic, ~1 min cold start | render.com/pricing |
+| **Back4App Containers** | ✅ officially confirmed | ✅ custom Docker | ❓ CLI/API unconfirmed | 0.25CPU/256MB; free containers reportedly limited to 60 min per deploy (⚠️ secondhand, not confirmed firsthand) | back4app.com/pricing/container-as-a-service |
+| **Hugging Face Spaces (Docker)** | ✅ sign-up without a card | ✅ Docker SDK | ✅ `HfApi.create_repo(space_sdk=docker)` | ⚠️ forum reports say Docker Spaces may now need PRO (paid); egress only on 80/443/8080; sleeps when idle | discuss.huggingface.co (not confirmed firsthand) |
+| **Fly.io** | ❌ new accounts need a card | ✅ | ✅ | No longer free | — |
+| **Koyeb** | ⚠️ may need a card / defaults to paid | ✅ | ✅ | 1 service, scale-to-zero | koyeb.com/pricing (conflicting) |
+| **Cloud Run** | ❌ needs a card | ✅ | ✅ | No charge within the free tier, but **not completely free** | (this project already has a cloudrun provider; listed as an option) |
 
-## 建議（待你拍板）
+## Recommendation (waiting for your decision)
 
-- **零憑證即驗證的選擇（已實作＋實測）：Cloudflare quick tunnel**——`infra/serve-free.sh` 直接把對戰伺服器對外公開，零帳號、零信用卡、零設定，已實測公開 `*.trycloudflare.com` 網址可達並服務 API 與像素遊戲。適合「開賽即起、散場即拆」的臨時公開。限制：網址每次隨機、非持久。
-- **持久化主選：Render 免費 web service**（免卡一手確認、支援 Docker、有 API、750hr/月，需你的免費帳號 API 金鑰才能自動佈建）。備援：Back4App。
-- **CTF 靶機：維持本機 Docker**（完全免費＋隔離）；雲端靶機延後。
-- 休眠/冷啟對「開賽才拉起」可接受；若要常駐可用外部 ping 保活（注意別違反 ToS 的 keep-alive 規定）。
+- **Option verified with zero credentials (implemented and tested): Cloudflare quick tunnel**. `infra/serve-free.sh` puts the match server online directly, with no account, no credit card and no setup. Tested: the public `*.trycloudflare.com` URL is reachable and serves the API and the pixel game. It suits temporary public hosting that starts with a match and is torn down after it. Limit: the URL is random each time and not persistent.
+- **Main choice for persistence: Render free web service** (no card, confirmed firsthand; supports Docker; has an API; 750hr/month; automatic provisioning needs your free account's API key). Fallback: Back4App.
+- **CTF targets: keep them on local Docker** (completely free and isolated); cloud targets are deferred.
+- Sleep and cold starts are acceptable for "start only when a match begins". To keep it always on, an external ping can keep it awake (watch out for ToS rules on keep-alives).
 
-## 待辦（限制重置後補）
-- 一手讀 Render API / render.yaml 免費層佈建細節，確認能用 API 自動 create/destroy。
-- 一手讀各平台 ToS 對「脆弱應用/安全測試」的條款（決定雲端靶機是否可能）。
-- HF Docker Space 是否仍免費、Koyeb 是否已需卡，以官方頁/論壇一手確認。
-- 選定後實作對應 provider（需你提供該平台的 API 金鑰／帳號，類似 Grok 金鑰的關卡）。
+## To do (after the limit resets)
+- Read Render's API / render.yaml free tier provisioning details firsthand, and confirm that the API can create/destroy automatically.
+- Read each platform's ToS firsthand for clauses on "vulnerable applications / security testing" (this decides whether cloud targets are possible at all).
+- Confirm firsthand, on the official page or forum, whether HF Docker Spaces are still free and whether Koyeb now needs a card.
+- Once chosen, implement the matching provider (needs your API key / account for that platform, a gate similar to the Grok key).
 
-## 來源
-- Render 定價：https://render.com/pricing
-- Back4App 容器定價：https://www.back4app.com/pricing/container-as-a-service
-- HF Spaces（Docker 轉付費討論）：https://discuss.huggingface.co/t/docker-sdk-now-marked-as-paid-when-creating-a-new-space/177580
-- 免費層彙整（二手，需查證）：https://snapdeploy.dev/state-of-free-hosting
+## Sources
+- Render pricing: https://render.com/pricing
+- Back4App container pricing: https://www.back4app.com/pricing/container-as-a-service
+- HF Spaces (discussion of Docker becoming paid): https://discuss.huggingface.co/t/docker-sdk-now-marked-as-paid-when-creating-a-new-space/177580
+- Free tier roundup (secondhand, needs checking): https://snapdeploy.dev/state-of-free-hosting

@@ -1,4 +1,4 @@
-"""Mode 註冊表與工廠。加入新玩法＝在此註冊一個 mode，引擎不動。"""
+"""Mode registry and factory. Adding a game mode = registering a mode here; the engine stays untouched."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ REGISTRY: dict[str, type[Mode]] = {
 def build_mode(name: str, config: dict[str, Any]) -> Mode:
     cls = REGISTRY.get(name)
     if cls is None:
-        raise ValueError(f"未知對戰模式：{name}（可用：{', '.join(REGISTRY)}）")
+        raise ValueError(f"unknown match mode: {name} (available: {', '.join(REGISTRY)})")
     return cls(config)
 
 

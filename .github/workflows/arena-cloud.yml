@@ -1,27 +1,41 @@
 name: Arena free-cloud server
 
-# 在 GitHub 免費雲端 runner 上自動架設對戰伺服器：
-# 起 uvicorn + Cloudflare quick tunnel 取得公開網址，自動開一局，網址印在 job summary。
-# 零帳號、零信用卡、不佔本機。手動從 Actions 分頁按 "Run workflow"，或用 API 觸發（開賽即架站）。
+# Hosts the public match server (lobby + bring-your-own-agent connections + spectating) on a free GitHub runner:
+# starts uvicorn + a Cloudflare quick tunnel for a public URL and writes it to server.json (the fixed Pages
+# entry point reads it), so the frontend connects to the live server on page load. Restarts every 5 hours on
+# a schedule for near-continuous uptime (Actions is free for public repos).
 #
-# 想在雲端跑「真實跨廠商」：把金鑰設成 repo secrets（Settings → Secrets → Actions）：
-#   ARENA_OPENAI_BASE_URL（如 https://api.x.ai/v1）、ARENA_OPENAI_API_KEY
-# 未設則用離線 demo（mock）代理。各家原生 CLI（claude/codex/grok）在 runner 上無登入，故雲端走 openai_compat。
+# This server holds and uses no one's model keys: players connect their own agents (with their own keys)
+# via connect tokens, and the public policy only allows remote (player-provided) and mock (demo) agents.
+#
+# Privilege separation: the write token is used only by git commands under the runner account (via env
+# vars, never written to .git/config); the public-facing uvicorn runs as a separate system account "arena"
+# with no sudo (no_new_privs, empty environment, no outbound network), from a read-only copy of the code
+# in /opt/arena. Backups read files as arena with time and size limits, then sanitize_state.py rebuilds
+# the content, so root never reads paths arena controls. Even if the server is compromised it cannot read
+# the token, modify the repo, or push arbitrary content to the data branch.
+# The "Verify isolation" step below tests these conditions and aborts if any fails.
 
 on:
   workflow_dispatch:
     inputs:
       minutes:
-        description: "伺服器保持上線的分鐘數"
+        description: "Minutes to keep the server online"
         default: "300"
-      mode:
-        description: "對戰類型 quiz 或 task"
-        default: "quiz"
   schedule:
-    - cron: "0 */5 * * *"   # 每 5 小時自動重啟，近乎持續在線（公開 repo 的 Actions 免費不限量）
+    - cron: "0 */5 * * *"
 
 permissions:
-  contents: write
+  contents: write   # used only by the runner account's git push (server.json, data branch)
+
+concurrency:
+  group: arena-server
+  cancel-in-progress: true   # a new server replaces the old one, so server.json always points to the latest
+
+env:
+  CLOUDFLARED_VERSION: "2026.10.0"
+  # From that release's SHA256 list in the release notes, checked against the actual downloaded file
+  CLOUDFLARED_SHA256: "d33ff2d14475178d2012c2c56beba87389ac5ded27649519f198a7d3134a99db"
 
 jobs:
   serve:
@@ -29,54 +43,117 @@ jobs:
     timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install deps
-        run: pip install -e ".[server]"
-      - name: Install cloudflared
+        run: pip install ".[server]"
+      - name: Install cloudflared (pinned, checksum verified)
         run: |
-          curl -fsSL -o cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          curl -fsSL -o cloudflared "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64"
+          echo "${CLOUDFLARED_SHA256}  cloudflared" | sha256sum -c -
           chmod +x cloudflared
-      - name: Serve + tunnel + auto-match
-        env:
-          ARENA_OPENAI_BASE_URL: ${{ secrets.ARENA_OPENAI_BASE_URL }}
-          ARENA_OPENAI_API_KEY: ${{ secrets.ARENA_OPENAI_API_KEY }}
-          MODE: ${{ github.event.inputs.mode }}
-          MINUTES: ${{ github.event.inputs.minutes }}
+      - name: Restore lobby state (ratings, ladder)
+        run: ./infra/state-sync.sh restore
+      - name: Prepare isolated server account
         run: |
           set -e
-          python -m uvicorn server.app:app --host 127.0.0.1 --port 8798 --log-level warning &
-          ./cloudflared tunnel --url http://localhost:8798 --no-autoupdate > cf.log 2>&1 &
-          URL=""
-          for i in $(seq 1 40); do URL=$(grep -oE 'https://[-a-z0-9]+\.trycloudflare\.com' cf.log | head -1 || true); [ -n "$URL" ] && break; sleep 1; done
-          [ -n "$URL" ] || { echo "tunnel 逾時"; cat cf.log; exit 1; }
-          sleep 3
-          {
-            echo "## 對戰伺服器已在 GitHub 免費雲端上線"
-            echo "- 公開網址：$URL"
-            echo "- 大眾介面：$URL/game/index.html"
-            echo "- 像素劇場：$URL/game/arena.html"
-          } >> "$GITHUB_STEP_SUMMARY"
-          # 把當前公開網址寫到固定位置：Pages 服務 /server.json，前端據此自動連到現役伺服器（持久固定入口）
-          printf '{"server":"%s","updated":"%s"}\n' "$URL" "$(date -u +%FT%TZ)" > server.json
+          sudo useradd --system --create-home --shell /usr/sbin/nologin arena
+          chmod 700 "$HOME"
+          sudo mkdir -p /opt/arena
+          git archive HEAD | sudo tar -x -C /opt/arena
+          sudo mkdir -p /opt/arena/runs
+          for f in lobby_state.json ladder.json; do
+            if [ -f "runs/$f" ]; then sudo install -m 600 "runs/$f" "/opt/arena/runs/$f"; fi
+          done
+          sudo chown -R arena:arena /opt/arena/runs
+          # The server only receives tunnel traffic over loopback; remote/mock agents under the public policy need no outbound access
+          sudo iptables -A OUTPUT -m owner --uid-owner arena ! -o lo -j REJECT
+          sudo ip6tables -A OUTPUT -m owner --uid-owner arena ! -o lo -j REJECT
+          # no DNS either (the local stub at 127.0.0.53 forwards queries out). Name lookups through
+          # systemd-resolved's varlink socket are not covered; the account holds no secrets to leak that way.
+          for proto in udp tcp; do
+            sudo iptables -A OUTPUT -m owner --uid-owner arena -o lo -p "$proto" --dport 53 -j REJECT
+            sudo ip6tables -A OUTPUT -m owner --uid-owner arena -o lo -p "$proto" --dport 53 -j REJECT
+          done
+      - name: Verify isolation
+        run: |
+          set -e
+          if sudo -u arena test -r "$GITHUB_WORKSPACE/.git/config"; then echo "arena can read the workspace"; exit 1; fi
+          if sudo -u arena sudo -n true 2>/dev/null; then echo "arena has sudo"; exit 1; fi
+          if grep -qi "extraheader\|authorization" .git/config; then echo ".git/config contains credentials"; exit 1; fi
+          if sudo -u arena cat "/proc/$$/environ" >/dev/null 2>&1; then echo "arena can read the runner's environment"; exit 1; fi
+          if sudo -u arena test -r "$RUNNER_TEMP"; then echo "arena can read RUNNER_TEMP"; exit 1; fi
+          if id -nG arena | grep -qw docker; then echo "arena is in the docker group"; exit 1; fi
+          if sudo -u arena curl -s --max-time 5 -o /dev/null https://github.com; then echo "arena has outbound network access"; exit 1; fi
+          if sudo -u arena python3 -c "import socket;s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.settimeout(3);s.sendto(b'\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x06github\x03com\x00\x00\x01\x00\x01',('127.0.0.53',53));s.recv(512)" 2>/dev/null; then
+            echo "arena can send DNS queries"; exit 1; fi
+          # Run the real backup (no push) with a planted symlink: the runner's environment must never reach runs/.
+          # /proc/<pid>/environ holds the environment from process start, so look for variables set at that point.
+          sudo -u arena ln -sf "/proc/$$/environ" /opt/arena/runs/ladder.json
+          before="$(sha256sum runs/ladder.json 2>/dev/null || true)"
+          ARENA_BACKUP_DRY=1 ./infra/ci-backup.sh
+          if grep -rqsE "RUNNER_TEMP=|GITHUB_WORKSPACE=" runs/; then echo "backup leaked the runner environment"; exit 1; fi
+          if [ "$before" != "$(sha256sum runs/ladder.json 2>/dev/null || true)" ]; then echo "backup accepted a symlinked file"; exit 1; fi
+          sudo rm -f /opt/arena/runs/ladder.json
+          if [ -f runs/ladder.json ]; then sudo install -o arena -g arena -m 600 runs/ladder.json /opt/arena/runs/ladder.json; fi
+          (cd /opt/arena && sudo setpriv --reuid=arena --regid=arena --init-groups --no-new-privs \
+            env -i PATH=/usr/bin:/bin LD_LIBRARY_PATH="$pythonLocation/lib" "$(command -v python)" -c "import uvicorn, fastapi, server.app")
+          echo "isolation ok"
+      - name: Serve public lobby + tunnel
+        env:
+          MINUTES: ${{ github.event.inputs.minutes }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          # A public server never enables host adapters; abort if it is set, just in case
+          if [ "${ARENA_ALLOW_HOST_ADAPTERS:-}" = "1" ]; then echo "ARENA_ALLOW_HOST_ADAPTERS must not be set on a public server"; exit 1; fi
+          # Accept digits only so $(( )) arithmetic expansion can't be injected; cap at 340 (job timeout 350)
+          MINUTES="${MINUTES:-300}"
+          case "$MINUTES" in ''|*[!0-9]*) echo "minutes must be a positive integer"; exit 1 ;; esac
+          MINUTES=$((10#$MINUTES))   # strip leading zeros so "08" is not read as octal
+          if [ "$MINUTES" -gt 340 ]; then MINUTES=340; fi
+          # git auth goes through env vars (/proc/<pid>/environ is readable only by the same account), never the command line or .git/config
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
+          unset GH_TOKEN
           git config user.email "actions@users.noreply.github.com"
           git config user.name "arena-bot"
-          git add server.json && git commit -m "chore: 更新現役免費雲端伺服器網址" && git push || true
-          MODE="${MODE:-quiz}"
-          if [ "$MODE" = "task" ]; then
-            MC='{"tasks":[{"id":"t1","prompt":"抽出 email 成 JSON 陣列","context":"ann@a.com 與 bob@b.com","check":{"kind":"json_keys","min_items":2}}]}'
-          else
-            MC='{"questions":[{"id":"q1","prompt":"日本的首都是哪座城市？只回答城市名。","answer":"東京","kind":"contains"},{"id":"q2","prompt":"17 乘以 23 等於多少？只回答數字。","answer":"391","kind":"numeric"}]}'
-          fi
-          if [ -n "${ARENA_OPENAI_API_KEY:-}" ]; then
-            AGENTS='[{"id":"Remote","adapter":"openai_compat","model":"grok-4.20","prompt_author":"cloud"},{"id":"Baseline","adapter":"mock","model":"demo","prompt_author":"cloud","params":{"reply":"東京"}}]'
-          else
-            AGENTS='[{"id":"Alpha","adapter":"mock","model":"demo-A","prompt_author":"x","params":{"reply":"東京"}},{"id":"Beta","adapter":"mock","model":"demo-B","prompt_author":"y","params":{"reply":"大阪"}}]'
-          fi
-          MID=$(curl -s --max-time 25 -X POST "http://127.0.0.1:8798/api/matches" -H 'content-type: application/json' \
-            -d "{\"mode\":\"$MODE\",\"ratings_path\":\"\",\"timeout_seconds\":150,\"max_wall_seconds\":400,\"mode_config\":$MC,\"agents\":$AGENTS}" \
-            | python -c "import sys,json;print(json.load(sys.stdin).get('match_id',''))" || true)
-          echo "- 本局觀戰：$URL/game/arena.html?match=$MID&api=$URL" >> "$GITHUB_STEP_SUMMARY"
-          echo "伺服器上線 $URL ，保持 ${MINUTES:-300} 分鐘"
-          sleep $(( ${MINUTES:-300} * 60 ))
+          ( while true; do sleep 600; ./infra/ci-backup.sh || true; done ) &   # back up ratings every 10 minutes
+          PY="$(command -v python)"
+          # Server output goes to a runner-private file, not the public job log (prevents forged workflow commands)
+          ( cd /opt/arena && sudo setpriv --reuid=arena --regid=arena --init-groups --no-new-privs \
+              env -i PATH=/usr/bin:/bin HOME=/home/arena LD_LIBRARY_PATH="$pythonLocation/lib" \
+              "$PY" -m uvicorn server.app:app --host 127.0.0.1 --port 8798 --log-level warning \
+              --limit-concurrency 300 --timeout-keep-alive 5 > "$RUNNER_TEMP/server.log" 2>&1 ) &
+          ./cloudflared tunnel --url http://127.0.0.1:8798 --no-autoupdate > cf.log 2>&1 &
+          URL=""
+          for i in $(seq 1 40); do URL=$(grep -oE 'https://[-a-z0-9]+\.trycloudflare\.com' cf.log | head -1 || true); [ -n "$URL" ] && break; sleep 1; done
+          [ -n "$URL" ] || { echo "tunnel timed out"; cat cf.log; exit 1; }
+          for i in $(seq 1 30); do curl -fsS -o /dev/null "http://127.0.0.1:8798/api/health" && break; sleep 1; done
+          curl -fsS -o /dev/null "http://127.0.0.1:8798/api/health" || { echo "server did not start"; tail -50 "$RUNNER_TEMP/server.log"; exit 1; }
+          {
+            echo "## Public match server is live"
+            echo "- Server: $URL"
+            echo "- Lobby: $URL/game/index.html"
+            echo "- Join as a player: python -m clients.arena_connect --server $URL --name your-name --cmd \"your agent command\" (--lang zh-TW/zh-CN/en/ja)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          printf '{"server":"%s","updated":"%s"}\n' "$URL" "$(date -u +%FT%TZ)" > server.json
+          git add server.json && git commit -m "chore: update live server URL" && git push || true
+          echo "Server live at $URL for $MINUTES minutes"
+          sleep $(( MINUTES * 60 ))
+      - name: Final backup
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="http.https://github.com/.extraheader"
+          GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          export GIT_CONFIG_VALUE_0
+          unset GH_TOKEN
+          git config user.email "actions@users.noreply.github.com"
+          git config user.name "arena-bot"
+          ./infra/ci-backup.sh || true

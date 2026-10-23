@@ -1,4 +1,4 @@
-"""配置器註冊表與工廠。換雲端只動 provider，引擎與模式不動。"""
+"""Provisioner registry and factory. Switching clouds only touches the provider; the engine and modes stay untouched."""
 
 from __future__ import annotations
 
@@ -8,16 +8,16 @@ from .freehost import FreeHostProvisioner
 from .local import LocalDockerProvisioner
 
 REGISTRY: dict[str, type[Provisioner]] = {
-    "local": LocalDockerProvisioner,       # 本機 Docker，隔離私有（真脆弱映像走這條）
-    "freehost": FreeHostProvisioner,       # 免費空間（Cloudflare tunnel），僅 benign self 靶機
-    "cloudrun": CloudRunProvisioner,       # GCP Cloud Run（非完全免費，選項）
+    "local": LocalDockerProvisioner,       # local Docker, isolated and private (real vulnerable images go here)
+    "freehost": FreeHostProvisioner,       # free hosting (Cloudflare tunnel), benign self targets only
+    "cloudrun": CloudRunProvisioner,       # GCP Cloud Run (not entirely free, optional)
 }
 
 
 def build_provisioner(name: str) -> Provisioner:
     cls = REGISTRY.get(name)
     if cls is None:
-        raise ValueError(f"未知配置器：{name}（可用：{', '.join(REGISTRY)}）")
+        raise ValueError(f"unknown provisioner: {name} (available: {', '.join(REGISTRY)})")
     return cls()
 
 

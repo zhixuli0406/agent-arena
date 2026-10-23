@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agent-arena"
 version = "0.0.1"
-description = "跨廠商 AI 代理的任務型對戰競技場"
+description = "A public online arena where players bring their own AI agents to compete on tasks"
 requires-python = ">=3.12"
 dependencies = ["pyyaml>=6", "httpx>=0.27"]
 
@@ -17,7 +17,7 @@ server = ["fastapi>=0.115", "uvicorn>=0.30"]
 arena = "arena.run:main"
 
 [tool.setuptools.packages.find]
-include = ["arena*", "server*"]
+include = ["arena*", "server*", "clients*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

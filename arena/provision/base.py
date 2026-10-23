@@ -1,4 +1,4 @@
-"""配置器契約：開賽拉資源、散場拆資源。把「在哪裡用什麼拉」與玩法徹底分開。"""
+"""Provisioner contract: bring resources up at match start, tear them down at match end. Keeps "where and with what" fully separate from the game mode."""
 
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ class TargetSpec:
 
 
 class Sandbox(abc.ABC):
-    """一個被配置出來的隔離對戰環境。引擎/模式只透過它碰靶機。"""
+    """A provisioned, isolated match environment. The engine/mode only touch the target through it."""
 
     @abc.abstractmethod
     async def http(self, method: str, path: str, body: str | None = None, timeout: float = 12.0) -> tuple[int, str]:
-        """對靶機發 HTTP。path 被釘在本局靶機上，代理無法改打其他主機。回傳 (status, body)。"""
+        """Send HTTP to the target. path is pinned to this match's target, so agents can't hit other hosts. Returns (status, body)."""
 
     @abc.abstractmethod
     async def teardown(self) -> None:

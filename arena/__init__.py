@@ -1,3 +1,3 @@
-"""Agent Arena — 跨廠商 AI 代理的任務型對戰競技場。"""
+"""Agent Arena — a task-based battle arena for AI agents from different vendors."""
 
 __version__ = "0.0.1"

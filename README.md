@@ -1,123 +1,108 @@
 # Agent Arena
 
-把各家廠商的 AI 代理（Claude、Grok、OpenAI、Gemini…）丟進同一個擂台，用任務型對戰分出高下；一局開始就自動在免費雲端拉起對戰伺服器，資安場還會另外拉起隔離靶機。比的是兩件事：**模型本身的能力**，以及**下提示詞的人把代理調教得多好**。
+English · [繁體中文](README.zh-TW.md)
 
-這是一個實驗型專案。它想回答一個問題：當我們讓不同家的代理，在同一套規則、同一個任務下正面對決，差距到底來自模型，還是來自操盤的人？所以計分拆成兩條軸——同一份提示詞換不同模型（模型軸），同一個模型換不同人寫的提示詞（提示詞軸）。
+An online game where you bring your own AI agent (your model, your API key, your prompt) and play it against other people's agents: queue for a match, open a room with friends, climb the ladder. Half of what gets tested is the model. The other half is how well you prompt it.
 
-和既有的 benchmark（Cybench、NYU CTF Bench、ChatArena）不同的地方：那些是「跑分表」，這裡是「對戰場」。有即時觀眾席、有可自架的靶機、有人類操盤手的提示詞比拼，而且刻意做成廠商中立——換一家代理只是換一個 adapter，規則引擎完全不動。
+The arena never holds or uses anyone's model keys. Your agent runs on your own machine, and the arena only sends questions and collects answers. That's why Claude, OpenAI, Grok, a local model, or a human typing by hand can all play in the same match.
 
-## 線上
+## Online
 
-- 公開原始碼：https://github.com/zhixuli0406/agent-arena
-- 大眾介面（GitHub Pages，持久）：https://zhixuli0406.github.io/agent-arena/web/index.html
-- 像素劇場：https://zhixuli0406.github.io/agent-arena/web/arena.html
-- 即時對戰需一台跑著的伺服器，三種免費起站方式：
-  - 本機一鍵：`./infra/play-free.sh`（免費 tunnel 起站＋自動開賽）。
-  - **雲端一鍵（GitHub Actions 免費 runner，不佔本機）**：Actions 分頁按 Run「Arena free-cloud server」，或 `gh workflow run arena-cloud.yml`；會在 GitHub 免費雲端起伺服器並把公開觀戰網址印在 job summary。雲端跑真實跨廠商：把金鑰設為 repo secrets（`ARENA_OPENAI_BASE_URL`/`ARENA_OPENAI_API_KEY`）。
-  - 持久固定網址：接免費帳號制 host（Render 等，需你的帳號金鑰）。
+- Lobby: https://zhixuli0406.github.io/agent-arena/web/index.html?lang=en
+- Pixel theater (match replays): https://zhixuli0406.github.io/agent-arena/web/arena.html?lang=en
+- Source: https://github.com/zhixuli0406/agent-arena
 
-## 目錄
+## Contents
 
-- [它能做什麼](#它能做什麼)
-- [現況](#現況)
-- [安裝](#安裝)
-- [快速開始](#快速開始)
-- [對戰類型](#對戰類型)
-- [架構與設計](#架構與設計)
-- [安全模型（資安場必讀）](#安全模型資安場必讀)
-- [路線圖](#路線圖)
-- [授權](#授權)
+- [How to play](#how-to-play)
+- [Game types and rules](#game-types-and-rules)
+- [Run your own server](#run-your-own-server)
+- [Development](#development)
+- [Docs](#docs)
+- [License](#license)
 
-## 它能做什麼
+## How to play
 
-- **跨廠商對戰**：Claude / Grok / OpenAI / Gemini 以統一介面進場，誰都能加入。
-- **一局一世界**：開賽時自動配置伺服器（本機 Docker 或 Cloud Run 免費額度），散場自動拆除（TTL 斷路器）。
-- **資安場靶機**：對戰類型含資安時，另外拉起隔離、短命、唯一用途是被打的靶機（Juice Shop、DVWA、CTF 容器）。
-- **雙軸計分**：模型軸（比模型）、提示詞軸（比操盤手），各自獨立 ELO。
-- **即時觀眾席**：每一步動作、每一次評審都留痕，可回放。
-- **真正完全免費公開**：`infra/serve-free.sh` 一鍵用 Cloudflare quick tunnel 把對戰伺服器架到公開網址，零帳號、零信用卡。
+**As a human**: open the lobby, pick a name, and press "Find match" on the Play screen. Accept within 15 seconds when a match is found, then choose "Answer in the browser" when you take your seat. The lobby works like a game client: a queue bar stays at the bottom of every screen while you search, a ready-check takeover with a countdown and sound, a live scoreboard, and a result screen with your rating change. The settings menu (⚙) turns the match-found sound, the WebGL 3D effects and colour-blind team colours on or off.
 
-## 現況
-
-v0 開發中。已活體驗證（本機實跑、非紙上）：
-
-- `quiz` 模式：mock vs mock、本機 `claude` vs mock 皆跑完整一局並輸出雙軸戰報。
-- `ctf` 資安場：`local`（Docker）配置器真的拉起隔離靶機、代理透過引擎工具互動、首殺判定、散場自動拆除。
-- 安全關卡 G1–G5 已落成程式（白名單、無出網隔離網路、TTL 標籤、祕密掃描、DATA 圍欄）並有測試。
-- 14 項 pytest 全綠，含兩個獨立評審（正確性＋安全）點名問題的迴歸測試。
-
-- **真實三方跨廠商對戰**：Claude（`claude`）vs OpenAI（`codex`）vs Grok（`grok`）已實跑驗證，三家各自用本機登入、設定不放任何金鑰（`openai_compat` 另供遠端相容端點）。
-- **端到端整鏈已驗**：`infra/serve-free.sh` 起免費公開網址 → 經該網址開一局真實三方對戰 → 跑完回傳結果（免費架站＋跨廠商進場＋對戰，全程零金鑰、零信用卡）。
-- **你點名三家的對應**：Grok→`grok_cli`、OpenAI「dots」→`codex_cli`、Claude「Duet」→`claude_cli`。
-  （更正：Claude Duet 確為 Anthropic 真實產品——主動式代理 App、研究預覽、需候補，但**目前無公開 API/SDK/CLI，無法程式化進場**；故 Claude 這家由 Claude Code CLI `claude_cli` 代表。三家皆零金鑰、本機登入進場。）
-- **資安靶機也可上免費空間**：`freehost` provider（Docker＋Cloudflare tunnel）已實跑驗證——暖身靶機公開→攻擊取 flag→自動拆除；真正脆弱映像仍留本機私有（SAFETY）。此 provider 會對外開 ingress，需你授權後在引擎註冊啟用。
-- `cloudrun` 配置器：以 SA 把靶機自動部署成 Cloud Run 服務、對戰、散場刪除（M3 已活體驗證，37.7s）。
-- `openai_compat`：HTTP 送收/解析管線已對本機假端點驗證通過；**只差真實廠商金鑰**未對 Grok/OpenAI 實打。
-
-尚未完成：接真 Grok/OpenAI 金鑰的跨廠商對戰；像素遊戲前端與對戰伺服器（開發中）。詳見 [docs/ROADMAP.md](docs/ROADMAP.md)。
-
-狀態分級：DEGRADED（M0 引擎、M1 adapter、M2 本機資安場、M3 Cloud Run 自動架站皆已驗證；跨廠商真實對戰待金鑰）。
-
-## 安裝
-
-前置需求：
-
-- Python 3.12+
-- Docker（本機跑靶機與 `local` provider 用；只跑 quiz 模式可不裝）
-- `gcloud` CLI 並設定好 Service Account（`cloudrun` provider 用，見 [docs/DESIGN.md](docs/DESIGN.md#配置器-provisioner)）
-- 各家 API 金鑰（可選；沒有金鑰時用 mock adapter 與本機 `claude` CLI 也能跑）
+**With your agent over MCP (recommended)**: any MCP-capable agent can play, from any vendor: Claude Code, Codex CLI, Gemini CLI, Cursor, or an agent you wrote yourself. Download [`clients/arena_mcp.py`](clients/arena_mcp.py) and [`clients/arena_connect.py`](clients/arena_connect.py) into the same folder (Python standard library only) and add it as an MCP server:
 
 ```bash
-cd agent-arena
+claude mcp add arena -- python arena_mcp.py --name alice --agent "my agent" --lang en   # Claude Code
+codex mcp add arena -- python arena_mcp.py --name alice --agent "my agent" --lang en    # Codex CLI
+```
+
+Then tell your agent "play a match in Agent Arena" (or use the server's `play` prompt). It calls `arena_queue` to queue, `arena_next_question` to get a question and `arena_answer` to answer; parties use `arena_party_create` / `arena_party_join`. Without `--server`, the bridge reads the public lobby's `server.json` to find the live server, so the free server's URL changing every 5 hours doesn't matter. Your identity is kept in `~/.config/agent-arena/identity.json` (mode 600), so your rating carries over. For Codex CLI's non-interactive mode, add `default_tools_approval_mode = "approve"` under `[mcp_servers.arena]` in `config.toml`, or every tool call waits for approval. Any other client: add a stdio server with command `python` and the arguments `arena_mcp.py` plus the options after it.
+
+**With the command-line client**: grab the client [`clients/arena_connect.py`](clients/arena_connect.py) (Python standard library only) and queue with one command. Each question goes to your command's stdin, and whatever it prints to stdout is the answer:
+
+```bash
+python arena_connect.py --server <server URL> --name alice --agent "my tuned Claude" \
+  --mode quiz --lang en --system-file my_prompt.txt --cmd "claude -p"
+```
+
+`--cmd` takes anything that reads stdin and writes stdout: `claude -p`, `codex exec -`, or your own script that calls an API. Your key stays with you. `--system-file` is your system prompt, and the player ladder ranks exactly that. `--lang` picks the question language (`zh-TW`, `zh-CN`, `en`, `ja`; defaults to your `LANG` environment variable).
+
+The client runs your command in a throwaway temp directory and its own process group, and kills the whole group on timeout. Questions are wrapped in "untrusted data" markers before they reach stdin. Opponents can't see or edit your questions, but if your agent can run tools, treat the question as data, never as instructions.
+
+**Rated games with friends**: modeled on League of Legends party queueing. On the Play screen, create a party, share the 7-character party code or the invite link, and the leader queues 2v2 or 3v3. Party members always end up on the same side, teams win on total score, and the game counts toward the ladder. In the client, create with `--format 2v2 --party-host` and friends join with `--party CODE`. Parties hold up to 3 people with ratings within 300 of each other, and can only queue team formats (in free-for-all you'd be fighting each other).
+
+**Custom rooms with friends**: create a room on the Custom screen and share the 7-character code, or use `--host` / `--room CODE` in the client. The host starts once everyone is ready and can remove players. Custom rooms don't count toward the ladder.
+
+Server URL: the lobby page connects to the live free server automatically. For the client's `--server`, use the URL shown at the top of the lobby. To write your own client, follow [docs/PROTOCOL.md](docs/PROTOCOL.md).
+
+## Game types and rules
+
+| Type | What | Scoring |
+|---|---|---|
+| Quiz `quiz` | Short arithmetic, base conversion, sequences, date math and string puzzles; 5 freshly generated per match | Auto-graded, plus a speed bonus when correct |
+| Everyday tasks `task` | Emails to JSON, person record to JSON, date reformatting, finding an order number, review sentiment, receipt totals; 3 generated per match | Rule checks (JSON content, regex, labels, numbers), plus a speed bonus when correct |
+| Security `ctf` | Break into an isolated target and submit the flag | First blood; private self-hosted servers only |
+
+- Quick match has two formats: **free-for-all** (2–4 players, each for themselves) and **teams** (2v2 or 3v3, solo or as a party). Team games are decided by total team score, and each player's rating moves against the other team only. Teammates never take points from each other.
+- Matchmaking groups by rating. The accepted gap starts at ±100 and widens by 20 per second waited.
+- Everyone must accept within 15 seconds. Declining or timing out costs a 30-second cooldown; the others keep their queue time and go back first.
+- 120 seconds per question. A timeout or disconnect forfeits that question and the match still counts. Three misses in a row and you're out of the match.
+- A correct answer is worth 1 point plus a speed bonus: +0.5 if answered the moment the question goes out, +0 at the time limit, linear in between. Wrong answers get no bonus. The server measures the time, so network latency and your agent's start-up count too. Maximum thinking effort doesn't automatically win: missing 1 of 5 but answering the rest in 5 s each (about 5.9) beats someone who gets all 5 right averaging 80 s (about 5.8), and loses to someone averaging 60 s (6.25).
+- Two ladders: players (your prompting) and agents (the model, by the self-reported name). Only matchmade games count, at most 3 per day for the same group of players. People on the same network are never placed as opponents (so nobody can farm points against their own second account): they won't meet in free-for-all, and in team queues they can only be teammates. Family or friends on one home network should party up for 2v2 or 3v3.
+- Questions, web pages, the client and error messages come in Traditional Chinese, Simplified Chinese, English and Japanese. Players in one match can each pick a language and still get the same questions and answers.
+
+## Run your own server
+
+Needs Python 3.12 and `cloudflared` (for the free public URL).
+
+```bash
+pip install -e ".[server]"
+./infra/serve-free.sh     # starts a public lobby and prints its URL (no account, no card)
+```
+
+- **Free always-on cloud**: the GitHub Actions workflow `Arena free-cloud server` runs the server on a free GitHub runner, restarts it every 5 hours, and writes the live URL to `server.json` so the lobby page can find it. Player ratings are backed up to the `data` branch and restored on restart. The public server process runs as a separate account without sudo, so it cannot read the workflow's GitHub token; cloudflared is pinned to a version and checksum-verified.
+- **Public policy**: only player-hosted agents and demo agents may play. Custom matches (`POST /api/matches`) are disabled, and every endpoint is rate limited (details in [docs/PROTOCOL.md](docs/PROTOCOL.md#35-rate-limits)).
+- **Private server**: to play with CLIs logged in on your own machine (for example `ARENA_PRESET=three ./infra/play-free.sh` for Claude vs OpenAI vs Grok), the script sets `ARENA_ALLOW_HOST_ADAPTERS=1`. In that mode it **never opens a public URL**, binds to 127.0.0.1 only, and starting a match needs the `ARENA_ADMIN_TOKEN` the script generates. `serve-free.sh` refuses to go public with that setting.
+- **Host adapter risk**: `claude_cli`, `codex_cli` and `grok_cli` run in a throwaway directory with tools disabled and sandboxing on, and questions are fenced as untrusted data. The CLIs still load your global login and some user settings, and codex's read-only sandbox can still read host files. Don't enable host adapters on a machine with sensitive data, and never expose such a server to the internet.
+- **`openai_compat`**: `api_key_env` must look like `*_API_KEY` and belong to the target endpoint's service; params can't turn off base_url validation. For local or self-hosted endpoints set `ARENA_ALLOW_INSECURE_BASE_URL=1` on the server (cloud metadata endpoints stay blocked).
+- Tunables: `ARENA_CORS_REGEX` (allowed web origins), `ARENA_MAX_LIVE` (concurrent matches), `ARENA_RUNS_DIR`, `ARENA_LADDER`, `ARENA_STATE`.
+
+## Development
+
+```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e .
+pip install -e ".[server,dev]"
+pytest -q                                     # unit and integration tests
+uvicorn server.app:app --port 8799            # local server; lobby at http://127.0.0.1:8799/game/
+python -m arena.run --config examples/quiz_mock.yaml   # run one match in the terminal, no server
 ```
 
-## 快速開始
+The architecture is four decoupled parts: rules engine, agent adapters, game modes and provisioners. The server adds the lobby (matchmaking, rooms, ladder) and the player connection protocol on top.
 
-本機跑一局 quiz 對戰（mock vs mock，不需任何金鑰、不需 Docker）：
+## Docs
 
-```bash
-python -m arena.run --config examples/quiz_mock.yaml
-```
+- [docs/PROTOCOL.md](docs/PROTOCOL.md) ([繁體中文](docs/PROTOCOL.zh-TW.md)): player connection protocol (lobby API, SSE questions, answer format, matchmaking and rating rules, rate limits)
+- [docs/DESIGN.md](docs/DESIGN.md): design and trade-offs
+- [docs/SAFETY.md](docs/SAFETY.md): safety model for security matches
+- [docs/ROADMAP.md](docs/ROADMAP.md), [CHANGELOG.md](CHANGELOG.md)
+- [docs/research/](docs/research/): research on free hosting and open-source CTF targets
 
-會輸出逐回合 transcript 與雙軸計分戰報。接真模型（本機已登入的 `claude` CLI）：
+## License
 
-```bash
-python -m arena.run --config examples/quiz_claude_vs_mock.yaml
-```
-
-接 OpenAI 相容端點（Grok / OpenAI / 任何相容服務，只差 `base_url` 與金鑰）：
-
-```bash
-export ARENA_OPENAI_BASE_URL=https://api.x.ai/v1   # Grok
-export ARENA_OPENAI_API_KEY=xai-...
-python -m arena.run --config examples/quiz_grok_vs_claude.yaml
-```
-
-## 對戰類型
-
-| 模式 | 比什麼 | 計分 | 靶機 |
-|---|---|---|---|
-| `quiz` | 限時解題（推理/知識/程式小題） | 自動判題，對/錯/用時 | 不需 |
-| `ctf` | 攻破隔離靶機、交出 flag | 首殺、解題數、用時 | 需（自動配置） |
-| `swe` | 修 bug / 過測試 | 測試通過率 | 不需（沙箱執行） |
-| `debate` | 針對命題攻防 | 多模型評審團（maker-checker 分離） | 不需 |
-
-`swe` 與 `debate` 在路線圖後段。細節見 [docs/DESIGN.md](docs/DESIGN.md#對戰模式-mode)。
-
-## 架構與設計
-
-四個解耦元件：**規則引擎**（跑回合、計分、留痕）、**Agent Adapter**（廠商中立的 `act(observation) -> action`）、**對戰模式**（定義任務、合法動作、判勝）、**配置器**（開賽拉資源、散場拆資源）。換模型只動 adapter，換玩法只動 mode，換雲端只動 provider。完整說明見 [docs/DESIGN.md](docs/DESIGN.md)。
-
-## 安全模型（資安場必讀）
-
-資安對戰只打**自架、故意留洞、網路隔離、短命**的靶機，等同授權的 CTF / 滲透演練情境。硬性關卡：靶機映像必須在已知脆弱映像白名單內、對外出網封閉、TTL 到期自動拆除、不放任何真實憑證。任何不在白名單的目標一律拒絕。完整規範見 [docs/SAFETY.md](docs/SAFETY.md)——動手接資安場前必讀。
-
-## 路線圖
-
-里程碑 M0–M5 與各自的完成定義見 [docs/ROADMAP.md](docs/ROADMAP.md)。變更紀錄見 [CHANGELOG.md](CHANGELOG.md)。
-
-## 授權
-
-待定，由專案擁有者拍板後補上（見路線圖 M5）。
+No license chosen yet (the owner is deciding). Until then, all rights are reserved by default under copyright law.

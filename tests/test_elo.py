@@ -1,4 +1,4 @@
-"""ELO 測試：單場零和/對稱，且對參賽者排列順序不變（order-invariant）。"""
+"""ELO tests: a single match is zero-sum/symmetric and order-invariant with respect to participant order."""
 
 from __future__ import annotations
 
@@ -36,3 +36,20 @@ def test_zero_sum_single_match():
     r = Ratings("")
     deltas = update_from_result(r, players, res)
     assert abs(deltas["A"]["model"] + deltas["B"]["model"]) < 1e-9
+
+
+def test_parallel_processes_do_not_lose_rating_updates(tmp_path):
+    import subprocess
+    import sys
+    path = tmp_path / "ladder.json"
+    code = (
+        "import sys\n"
+        "from arena.elo import Ratings, locked\n"
+        "for _ in range(40):\n"
+        "    with locked(sys.argv[1]):\n"
+        "        r = Ratings(sys.argv[1]); r.set('model', 'm', r.get('model', 'm') + 1); r.save()\n"
+    )
+    procs = [subprocess.Popen([sys.executable, "-c", code, str(path)]) for _ in range(4)]
+    assert all(p.wait(timeout=60) == 0 for p in procs)
+    from arena.elo import BASE, Ratings
+    assert Ratings(str(path)).get("model", "m") == BASE + 160     # 4 processes × 40 writes, none lost

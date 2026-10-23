@@ -1,13 +1,15 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Arena</title>
-<meta name="description" content="把跨廠商 AI 代理的一局對戰演成 8-bit 像素對戰遊戲">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<title data-i18n="a_title">Agent Arena</title>
+<meta name="description" data-i18n-content="a_desc" content="Replays an AI agent match as an 8-bit pixel fight">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DM+Mono:wght@400;500&family=DotGothic16&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#15131f; --panel:#221d33; --panel2:#2d2742; --edge:#4a4166;
@@ -106,7 +108,24 @@ a{color:var(--gold)}
 input,select{font-family:var(--mono); font-size:12px; background:var(--panel2); color:var(--ink); border:2px solid var(--edge); border-radius:4px; padding:5px}
 .lobby label{display:inline-flex; gap:4px; align-items:center}
 .lobby .arm{padding:4px 7px}
+
+/* per-language fallbacks: Latin glyphs stay pixel/mono, CJK falls back to a fitting system face */
+:root:lang(zh-TW){--mono:'DM Mono', ui-monospace, Menlo, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", monospace; --pixel:'Press Start 2P', "PingFang TC", "Noto Sans TC", monospace}
+:root:lang(zh-CN){--mono:'DM Mono', ui-monospace, Menlo, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", monospace; --pixel:'Press Start 2P', "PingFang SC", "Noto Sans SC", monospace}
+:root:lang(ja){--mono:'DM Mono', ui-monospace, Menlo, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", monospace; --pixel:'Press Start 2P', 'DotGothic16', "Hiragino Sans", monospace}
+#matchId{max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lobby .row{display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; font-size:12px}
+.lobby input{min-width:0; width:220px; max-width:100%}
+a.btn{display:inline-block; font-family:var(--pixel); font-size:9px; color:var(--ink); background:var(--panel2);
+  border:2px solid var(--edge); border-radius:4px; padding:7px 9px; text-decoration:none; line-height:1.5}
+a.btn:hover{border-color:var(--gold)}
+.lang-select{font-family:var(--mono); font-size:11px; padding:4px 6px; cursor:pointer}
+.ticker .err{color:var(--danger)} .ticker .dim{color:var(--muted)}
+#lobbyMsg.err{color:var(--danger)}
 </style>
+<script src="js/i18n.js" defer></script>
+<script src="js/common.js" defer></script>
+<script src="js/arena.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -116,24 +135,22 @@ input,select{font-family:var(--mono); font-size:12px; background:var(--panel2); 
     <span class="chip" id="modeChip">mode</span>
     <span class="badge PARTIAL" id="statusBadge">—</span>
     <span class="spacer"></span>
-    <label class="file"><button type="button" onclick="document.getElementById('fileIn').click()">載入 transcript</button></label>
-    <input id="fileIn" type="file" accept=".jsonl,.json,.txt" style="display:none">
+    <span id="langHost"></span>
+    <button type="button" id="btnLoad" data-i18n="a_load">Load transcript</button>
+    <input id="fileIn" type="file" accept=".jsonl,.json,.txt" hidden>
   </header>
 
   <section class="panel lobby" id="lobby" style="padding:14px;margin-top:12px">
-    <div class="px" style="font-size:10px;color:var(--gold);margin-bottom:8px">大廳 · 開一局（需連到對戰伺服器）</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12px">
-      <label>伺服器 <input id="api" placeholder="(同源)" style="width:220px"></label>
-      <label>類型 <select id="lmode"><option value="quiz">quiz 解題</option><option value="ctf">ctf 資安</option></select></label>
+    <div class="px" style="font-size:10px;color:var(--gold);margin-bottom:8px" data-i18n="a_lobby_h">Demo match · needs a battle server</div>
+    <div class="row">
+      <label><span data-i18n="a_server">Server</span> <input id="api" data-i18n-placeholder="a_ph_same" placeholder="(same origin)" autocomplete="off" spellcheck="false"></label>
     </div>
-    <div id="agentRows" style="margin-top:8px"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
-      <button type="button" id="addAgent">＋ 代理</button>
-      <button type="button" id="btnStart">▶ 建立並觀戰</button>
-      <button type="button" id="btnRoom">建私人房</button>
-      <button type="button" id="btnQueue">隨機配對</button>
+    <div class="row" style="margin-top:8px">
+      <button type="button" id="btnDemo" data-i18n="a_btn_demo">▶ Start a demo and watch</button>
+      <a class="btn keep-lang" id="btnRoom" href="index.html" data-i18n="a_btn_online">Online matchmaking / rooms ↗</a>
       <span id="lobbyMsg" style="font-size:11px;color:var(--muted)"></span>
     </div>
+    <p class="hint" data-i18n="a_demo_note">The demo is a fixed match between two demo agents. Nobody's API keys are used.</p>
   </section>
 
   <section class="panel stage" id="stage"></section>
@@ -141,289 +158,28 @@ input,select{font-family:var(--mono); font-size:12px; background:var(--panel2); 
   <section class="panel hud">
     <span class="round" id="roundLbl">ROUND 0</span>
     <span class="spacer"></span>
-    <button id="btnStep" type="button">⏭ 步進</button>
-    <button id="btnPlay" type="button">▶ 播放</button>
-    <button id="btnSpeed" type="button">速度 1x</button>
-    <button id="btnReset" type="button">↺ 重播</button>
+    <button id="btnStep" type="button" data-i18n="a_step">⏭ Step</button>
+    <button id="btnPlay" type="button" data-i18n="a_play">▶ Play</button>
+    <button id="btnSpeed" type="button">Speed 1x</button>
+    <button id="btnReset" type="button" data-i18n="a_reset">↺ Replay</button>
   </section>
 
-  <section class="panel ticker" id="ticker">載入樣本對局中…</section>
-  <p class="hint">這是把一局對戰 transcript「播放」成像素對戰的前端。按「載入 transcript」可餵入 <code>runs/*.jsonl</code>；或接對戰伺服器的 <code>/api/matches/&lt;id&gt;/stream</code> 即時演出（SSE，之後接）。</p>
+  <section class="panel ticker" id="ticker" data-i18n="a_loading">Loading the sample match…</section>
+  <p class="hint" data-i18n="a_hint" data-i18n-html>Pixel theatre plays a match back as an 8-bit show. Load a <code>runs/*.jsonl</code> file to replay it, watch live with <code>?match=&lt;id&gt;</code>, or start a demo. For online games with humans and your own agents, head to the <a href="index.html" class="keep-lang">online lobby</a>.</p>
 </div>
 
 <div class="overlay" id="overlay">
-  <div class="card">
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="winTitle">
     <h2 id="winTitle">VICTORY</h2>
+    <div style="overflow-x:auto">
     <table>
-      <thead><tr><th>#</th><th>代理</th><th>模型</th><th>操盤手</th><th class="r">得分</th><th class="r">ELOΔ 模型/提示詞</th></tr></thead>
+      <thead><tr><th>#</th><th data-i18n="a_th_agent">Agent</th><th data-i18n="a_th_model">Model</th><th data-i18n="a_th_author">Prompter</th><th class="r" data-i18n="a_th_score">Score</th><th class="r" data-i18n="a_th_elo">ELO Δ model/prompt</th></tr></thead>
       <tbody id="resultBody"></tbody>
     </table>
+    </div>
     <div class="foot" id="resultFoot"></div>
-    <div style="text-align:center;margin-top:14px"><button type="button" onclick="document.getElementById('overlay').classList.remove('show')">關閉</button></div>
+    <div style="text-align:center;margin-top:14px"><button type="button" id="btnClose" data-i18n="a_close">Close</button></div>
   </div>
 </div>
-
-<script>
-"use strict";
-const PALETTE = ["#51d1f6","#ff6b6b","#8affc1","#ffa857","#c08bff","#ffe066","#6bd5ff","#ff8ad1"];
-
-// ---- 內嵌樣本（mock quiz，無真實機密）----
-const SAMPLE = [
- {type:"match_start",round:0,data:{match_id:"sample-quiz",mode:"quiz",agents:[
-   {id:"alpha",model:"mock-smart",prompt_author:"author-x"},
-   {id:"beta",model:"mock-dumb",prompt_author:"author-y"}]}},
- {type:"observation",round:1,agent:"alpha",data:{task:"日本的首都是哪座城市？"}},
- {type:"action",round:1,agent:"alpha",data:{content:"東京"}},
- {type:"grade",round:1,agent:"alpha",data:{qid:"cap-jp",correct:true}},
- {type:"action",round:1,agent:"beta",data:{content:"大阪"}},
- {type:"grade",round:1,agent:"beta",data:{qid:"cap-jp",correct:false}},
- {type:"observation",round:2,agent:"alpha",data:{task:"17 乘以 23 等於多少？"}},
- {type:"action",round:2,agent:"alpha",data:{content:"391"}},
- {type:"grade",round:2,agent:"alpha",data:{qid:"math-1",correct:true}},
- {type:"action",round:2,agent:"beta",data:{content:"390"}},
- {type:"grade",round:2,agent:"beta",data:{qid:"math-1",correct:false}},
- {type:"observation",round:3,agent:"alpha",data:{task:"A 比 B 高，B 比 C 高，誰最矮？"}},
- {type:"action",round:3,agent:"alpha",data:{content:"C"}},
- {type:"grade",round:3,agent:"alpha",data:{qid:"logic-1",correct:true}},
- {type:"action",round:3,agent:"beta",data:{content:"A"}},
- {type:"grade",round:3,agent:"beta",data:{qid:"logic-1",correct:false}},
- {type:"result",round:3,data:{scores:{alpha:3,beta:0},ranking:["alpha","beta"],status:"COMPLETE"}},
- {type:"elo",round:3,data:{alpha:{model:16,prompt:16},beta:{model:-16,prompt:-16}}}
-];
-
-// ---- 工具 ----
-function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0;}
-function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;}
-
-// 由 id 生成對稱 8x8 像素 sprite
-function spriteCells(id){
-  const h=hash(id); const c1=PALETTE[h%PALETTE.length]; const c2=PALETTE[(h>>5)%PALETTE.length];
-  const cells=[];
-  for(let y=0;y<8;y++){
-    const row=[];
-    for(let x=0;x<4;x++){
-      const bit=(hash(id+":"+y+":"+x))%100;
-      row[x]= bit<46 ? (bit<20? c2 : c1) : null;
-    }
-    const full=[...row, ...row.slice().reverse()];
-    cells.push(...full);
-  }
-  return {cells, c1};
-}
-function renderAvatar(node, id){
-  node.innerHTML="";
-  const {cells}=spriteCells(id);
-  for(const c of cells){const i=document.createElement("i"); if(c)i.style.background=c; node.appendChild(i);}
-}
-
-// ---- 狀態 ----
-let EVENTS=[], MODEL=null, idx=0, timer=null, speed=1, fighters={}, serverNode=null, maxRound=0;
-const SPEEDS=[1,2,4];
-
-function parseTranscript(text){
-  const out=[];
-  for(const line of text.split("\n")){const t=line.trim(); if(!t)continue; try{out.push(JSON.parse(t));}catch(e){}}
-  return out;
-}
-
-function buildModel(events){
-  const ms=events.find(e=>e.type==="match_start");
-  const agents=(ms&&ms.data.agents)||[];
-  const mode=(ms&&ms.data.mode)||"quiz";
-  maxRound=events.reduce((m,e)=>Math.max(m,e.round||0),0);
-  return {matchId:(ms&&ms.data.match_id)||"—", mode, agents, events};
-}
-
-function renderStage(){
-  const stage=document.getElementById("stage"); stage.innerHTML=""; fighters={}; serverNode=null;
-  const agents=MODEL.agents;
-  const left=el("div","side left"), right=el("div","side right");
-  const center=el("div","center");
-  agents.forEach((a,i)=>{
-    const f=el("div","fighter");
-    const av=el("i","avatar"); renderAvatar(av,a.id);
-    const meta=el("div","meta");
-    const color=PALETTE[hash(a.team||a.id)%PALETTE.length];
-    meta.appendChild(el("div","nm",(a.team?("["+a.team+"] "):"")+a.id)).style.color=color;
-    meta.appendChild(el("div","sub",(a.model||"—")+" · "+(a.prompt_author||"—")));
-    const hp=el("div","hpbar"); const hpi=el("i"); hp.appendChild(hpi); meta.appendChild(hp);
-    const sc=el("div","score","0 分"); meta.appendChild(sc);
-    const bub=el("div","bubble","待命…"); meta.appendChild(bub);
-    f.appendChild(av); f.appendChild(meta);
-    (i%2===0?left:right).appendChild(f);
-    fighters[a.id]={node:f,hp:hpi,score:sc,bubble:bub,val:0};
-  });
-  if(MODEL.mode==="ctf"){
-    const srv=el("div","server"); renderAvatar(srv,"THE-SERVER:"+MODEL.matchId);
-    serverNode=srv;
-    center.appendChild(el("div","lock","🔒 TARGET"));
-    center.appendChild(srv);
-  }else{
-    const q=el("div","qbanner","QUIZ"); q.id="qbanner"; center.appendChild(q);
-  }
-  stage.appendChild(left); stage.appendChild(center); stage.appendChild(right);
-  document.getElementById("matchId").textContent=MODEL.matchId;
-  document.getElementById("modeChip").textContent=MODEL.mode;
-}
-
-function setStatus(s){const b=document.getElementById("statusBadge"); b.className="badge "+(s||"PARTIAL"); b.textContent=s||"—";}
-function ticker(html){document.getElementById("ticker").innerHTML=html;}
-function floatText(fid,txt,color){
-  const f=fighters[fid]; if(!f)return;
-  const t=el("div","float",txt); t.style.color=color||"var(--gold)";
-  f.node.appendChild(t); setTimeout(()=>t.remove(),1000);
-}
-function refreshBars(){
-  const vals=Object.values(fighters).map(f=>f.val); const max=Math.max(1,...vals);
-  for(const id in fighters){const f=fighters[id]; f.hp.style.width=Math.round(f.val/max*100)+"%"; f.score.textContent=f.val+" 分";}
-}
-
-function applyEvent(ev){
-  const r=ev.round||0;
-  if(r) document.getElementById("roundLbl").textContent="ROUND "+r;
-  const f=ev.agent?fighters[ev.agent]:null;
-  switch(ev.type){
-    case "observation":
-      if(MODEL.mode!=="ctf"){const q=document.getElementById("qbanner"); if(q)q.textContent=(ev.data.task||"").slice(0,80);}
-      break;
-    case "action":
-      if(f){f.bubble.textContent="▶ "+(ev.data.content||"").slice(0,80);}
-      ticker(`<b>${ev.agent}</b> 出手：${(ev.data.content||"").slice(0,90)}`);
-      break;
-    case "grade":
-      if(f){ if(ev.data.correct){f.val+=1; f.node.classList.add("attack"); setTimeout(()=>f.node.classList.remove("attack"),250);
-        floatText(ev.agent,"+1 ✓","var(--hp)"); // 命中：其他人閃一下
-        for(const id in fighters){if(id!==ev.agent){fighters[id].node.classList.add("hit"); setTimeout(()=>fighters[id].node.classList.remove("hit"),300);}}
-      } else { floatText(ev.agent,"✗","var(--muted)"); } refreshBars(); }
-      break;
-    case "request":
-      if(f){f.bubble.textContent="⌨ "+(ev.data.method||"")+" "+(ev.data.path||"");}
-      if(serverNode){serverNode.classList.add("jab"); setTimeout(()=>serverNode.classList.remove("jab"),250);}
-      ticker(`<b>${ev.agent}</b> → 靶機 ${ev.data.method||""} ${ev.data.path||""} <span style="color:var(--muted)">(HTTP ${ev.data.status})</span>`);
-      break;
-    case "solve":
-      if(f){f.val += ev.data.first?2000:1000; floatText(ev.agent, ev.data.first?"FIRST BLOOD!":"SOLVED","var(--win)");}
-      if(serverNode){serverNode.classList.add("broken");}
-      ticker(`💥 <b>${ev.agent}</b> 攻破靶機${ev.data.first?"（首殺）":""}，FLAG 到手！`);
-      refreshBars();
-      break;
-    case "submit_wrong": if(f)floatText(ev.agent,"FLAG?✗","var(--danger)"); break;
-    case "result": showResult(ev.data); break;
-    case "elo": MODEL.elo=ev.data; break;
-    case "teams": MODEL.teamScores=ev.data.team_scores; MODEL.teamRanking=ev.data.team_ranking; MODEL.teamMembers=ev.data.members; break;
-    case "team_elo": MODEL.teamElo=ev.data; break;
-    case "startup_error": ticker(`<span style="color:var(--danger)">啟動失敗：${(ev.data.error||"")}</span>`); break;
-  }
-}
-
-function showResult(data){
-  setStatus(data.status||"COMPLETE");
-  const body=document.getElementById("resultBody"); body.innerHTML="";
-  const ranking=data.ranking||Object.keys(data.scores||{});
-  const elo=MODEL.elo||{};
-  ranking.forEach((id,i)=>{
-    const a=MODEL.agents.find(x=>x.id===id)||{};
-    const d=elo[id]||{model:0,prompt:0};
-    const tr=el("tr", i===0?"rank1":"");
-    tr.appendChild(el("td",null,"#"+(i+1)));
-    tr.appendChild(el("td",null,id));
-    tr.appendChild(el("td",null,a.model||"—"));
-    tr.appendChild(el("td",null,a.prompt_author||"—"));
-    tr.appendChild(el("td","r",String((data.scores||{})[id] ?? 0)));
-    const dc=el("td","r"); const sgn=v=>(v>0?"+":"")+Math.round(v);
-    dc.innerHTML=`<span class="delta ${d.model>=0?'pos':'neg'}">${sgn(d.model)}</span> / <span class="delta ${d.prompt>=0?'pos':'neg'}">${sgn(d.prompt)}</span>`;
-    tr.appendChild(dc);
-    body.appendChild(tr);
-  });
-  let title = ranking[0]?("🏆 "+ranking[0]+" 勝"):"對局結束";
-  let foot = "狀態 "+(data.status||"—")+" · "+MODEL.mode+" · "+MODEL.matchId;
-  if(MODEL.teamScores){
-    const tr = MODEL.teamRanking || Object.keys(MODEL.teamScores);
-    if(tr[0]) title = "🏆 隊伍 "+tr[0]+" 勝";
-    foot = "隊伍："+tr.map(t=>{const d=(MODEL.teamElo||{})[t];
-      return t+" "+MODEL.teamScores[t]+(d!=null?(" (ELO "+(d>0?"+":"")+Math.round(d)+")"):"");}).join("　")+" ／ "+foot;
-  }
-  document.getElementById("winTitle").textContent = title;
-  document.getElementById("resultFoot").textContent = foot;
-  document.getElementById("overlay").classList.add("show");
-}
-
-// ---- 播放控制 ----
-function step(){ if(idx>=EVENTS.length) return false; applyEvent(EVENTS[idx]); idx++; return idx<EVENTS.length; }
-function play(){ if(timer){pause();return;} document.getElementById("btnPlay").textContent="⏸ 暫停";
-  timer=setInterval(()=>{ if(!step()){pause();} }, 900/speed); }
-function pause(){ if(timer)clearInterval(timer); timer=null; document.getElementById("btnPlay").textContent="▶ 播放"; }
-function reset(){ pause(); idx=0; document.getElementById("overlay").classList.remove("show"); load(EVENTS, MODEL.raw); }
-
-function load(events, rawForModel){
-  pause(); EVENTS=events; MODEL=buildModel(events); MODEL.raw=rawForModel||events; idx=0;
-  renderStage(); setStatus(null); document.getElementById("roundLbl").textContent="ROUND 0";
-  const ms=events.find(e=>e.type==="result"); if(ms){/* 預設不先爆雷 */}
-  ticker(`已載入對局 <b>${MODEL.matchId}</b>（${MODEL.mode}，${MODEL.agents.length} 位代理）。按「播放」開始演出。`);
-}
-
-document.getElementById("btnStep").onclick=()=>{pause(); step();};
-document.getElementById("btnPlay").onclick=play;
-document.getElementById("btnReset").onclick=reset;
-document.getElementById("btnSpeed").onclick=()=>{ const i=(SPEEDS.indexOf(speed)+1)%SPEEDS.length; speed=SPEEDS[i];
-  document.getElementById("btnSpeed").textContent="速度 "+speed+"x"; if(timer){pause();play();} };
-document.getElementById("fileIn").onchange=e=>{ const file=e.target.files[0]; if(!file)return;
-  const rd=new FileReader(); rd.onload=()=>{ const evs=parseTranscript(String(rd.result)); if(evs.length)load(evs); else ticker('<span style="color:var(--danger)">無法解析這個 transcript</span>'); }; rd.readAsText(file); };
-
-// ---- 大廳：建立對戰／建房／隨機配對（呼叫對戰伺服器）----
-function apiBase(){ return (document.getElementById("api").value||"").replace(/\/$/,"") || location.origin; }
-function lmsg(t,err){ const e=document.getElementById("lobbyMsg"); e.textContent=t; e.style.color=err?"var(--danger)":"var(--muted)"; }
-function agentRow(d){ d=d||{}; const row=el("div"); row.style.cssText="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0";
-  row.innerHTML=`<input class="aid" placeholder="id" value="${d.id||''}" style="width:90px">
-   <select class="aad"><option value="mock">mock</option><option value="claude_cli">claude_cli</option><option value="openai_compat">openai_compat</option></select>
-   <input class="amodel" placeholder="model" value="${d.model||''}" style="width:120px">
-   <input class="aauthor" placeholder="操盤手" value="${d.prompt_author||''}" style="width:90px">
-   <input class="ateam" placeholder="隊伍" value="${d.team||''}" style="width:70px">
-   <button type="button" class="arm">✕</button>`;
-  row.querySelector(".arm").onclick=()=>row.remove();
-  return row; }
-function gatherAgents(){ const out=[]; document.querySelectorAll("#agentRows > div").forEach(r=>{
-   const g=s=>r.querySelector(s).value.trim(); const id=g(".aid"); if(!id)return;
-   const a={id, adapter:r.querySelector(".aad").value, model:g(".amodel"), prompt_author:g(".aauthor")||"anon", team:g(".ateam")};
-   if(a.adapter==="mock") a.params={reply: a.model.endsWith("B")?"大阪":"東京"};
-   out.push(a); }); return out; }
-function lobbyCfg(){ const mode=document.getElementById("lmode").value;
-   const mode_config = mode==="ctf" ? {provider:"local",target:"arena-warmup",first_blood:true,flag:"FLAG{warmup_recon_ok}"}
-     : {questions:[{id:"q1",prompt:"日本首都？",answer:"東京",kind:"contains"},{id:"q2",prompt:"17×23=?",answer:"391",kind:"numeric"}]};
-   return {mode, mode_config, agents:gatherAgents(), ratings_path:""}; }
-async function apiPost(path,body){ const r=await fetch(apiBase()+path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body||{})});
-   if(!r.ok) throw new Error((await r.text()).slice(0,120)||r.status); return r.json(); }
-document.getElementById("addAgent").onclick=()=>document.getElementById("agentRows").appendChild(agentRow());
-document.getElementById("btnStart").onclick=async()=>{ try{ const cfg=lobbyCfg(); if(cfg.agents.length<2){lmsg("至少 2 位代理",1);return;}
-   lmsg("建立中…"); const {match_id}=await apiPost("/api/matches",cfg); lmsg("對局 "+match_id+" 開打"); connectLive(match_id, apiBase()); }catch(e){ lmsg("失敗："+e.message,1); } };
-document.getElementById("btnRoom").onclick=async()=>{ try{ const cfg=lobbyCfg();
-   const {code}=await apiPost("/api/rooms",{mode:cfg.mode,mode_config:cfg.mode_config,agents:cfg.agents});
-   lmsg("房碼 "+code+"：朋友 POST /api/rooms/"+code+"/join 加入，房主 POST /start 開賽"); }catch(e){ lmsg("失敗："+e.message,1); } };
-document.getElementById("btnQueue").onclick=async()=>{ try{ const cfg=lobbyCfg(); const a=cfg.agents[0]; if(!a){lmsg("先加一個代理",1);return;}
-   const r=await apiPost("/api/queue",{mode:cfg.mode,mode_config:cfg.mode_config,agent:a});
-   if(r.status==="matched"){ lmsg("配對成功 "+r.match_id); connectLive(r.match_id, apiBase()); } else lmsg("排隊中（還差 "+(r.need-r.waiting)+" 人）…"); }catch(e){ lmsg("失敗："+e.message,1); } };
-document.getElementById("agentRows").appendChild(agentRow({id:"alpha",model:"mock-A",prompt_author:"you",team:"Red"}));
-document.getElementById("agentRows").appendChild(agentRow({id:"beta",model:"mock-B",prompt_author:"rival",team:"Blue"}));
-
-// 即時觀戰：連對戰伺服器的 SSE，邊打邊演
-function connectLive(matchId, base){
-  base=(base||"").replace(/\/$/,"");
-  MODEL={matchId, mode:"quiz", agents:[], raw:[]};
-  renderStage();
-  ticker(`即時連線對局 <b>${matchId}</b>…`);
-  const es=new EventSource(base+"/api/matches/"+matchId+"/stream");
-  es.onmessage=(e)=>{ let ev; try{ev=JSON.parse(e.data);}catch(_){ return; }
-    if(ev.type==="match_start"){ MODEL=buildModel([ev]); MODEL.raw=[ev]; renderStage(); setStatus("RUNNING"); }
-    else { applyEvent(ev); }
-  };
-  es.addEventListener("end",()=>es.close());
-  es.onerror=()=>{ ticker('<span style="color:var(--danger)">即時串流中斷或結束</span>'); };
-}
-
-// 啟動：?match=<id>[&api=<base>] 即時觀戰；否則載入內嵌樣本
-const _params=new URLSearchParams(location.search);
-if(_params.get("match")){ connectLive(_params.get("match"), _params.get("api")||""); }
-else { load(SAMPLE.map(x=>x)); }
-</script>
 </body>
 </html>

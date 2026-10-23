@@ -1,6 +1,6 @@
-"""JSONL 留痕。每個事件一行，失敗事件也顯式寫入，絕不靜默吞掉。
+"""JSONL transcript. One event per line; failure events are written explicitly too, never silently swallowed.
 
-transcript 視為敏感產物（含完整靶機回應與 exploit 流量），以 0600 建立。
+The transcript is treated as sensitive output (it holds full target responses and exploit traffic) and is created with mode 0600.
 """
 
 from __future__ import annotations

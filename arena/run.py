@@ -1,4 +1,4 @@
-"""CLI 進入點：讀設定、跑一局、印戰報。"""
+"""CLI entry point: read the config, run one match, print the match report."""
 
 from __future__ import annotations
 
@@ -30,20 +30,20 @@ def _model_of(cfg: MatchConfig, agent_id: str) -> str:
 def print_report(report: MatchReport, cfg: MatchConfig) -> None:
     mark = _STATUS_MARK.get(report.status, "?")
     print()
-    print(f"=== 戰報 {report.match_id} · {report.mode} · {mark} {report.status} ===")
+    print(f"=== Match report {report.match_id} · {report.mode} · {mark} {report.status} ===")
     print()
-    print(f"{'名次':<4}{'代理':<12}{'模型':<18}{'操盤手':<14}{'得分':>6}  ELOΔ(模型/提示詞)")
+    print(f"{'Rank':<5}{'Agent':<12}{'Model':<18}{'Operator':<14}{'Score':>6}  ELOΔ(model/prompt)")
     print("-" * 78)
     result = report.result
     if result:
         for rank, agent_id in enumerate(result.ranking, 1):
             d = report.elo_deltas.get(agent_id, {"model": 0.0, "prompt": 0.0})
             print(
-                f"{rank:<4}{agent_id:<12}{_model_of(cfg, agent_id):<18}{_author_of(cfg, agent_id):<14}"
+                f"{rank:<5}{agent_id:<12}{_model_of(cfg, agent_id):<18}{_author_of(cfg, agent_id):<14}"
                 f"{result.scores.get(agent_id, 0.0):>6.1f}  {d['model']:+.1f} / {d['prompt']:+.1f}"
             )
     print()
-    print("用量：")
+    print("Usage:")
     for agent_id, u in report.usage_totals.items():
         print(
             f"  {agent_id:<12} in={u['input_tokens']} out={u['output_tokens']} "
@@ -51,7 +51,7 @@ def print_report(report: MatchReport, cfg: MatchConfig) -> None:
         )
     if report.degraded_reasons:
         print()
-        print("⚠️ 降級/異常（已顯式記錄，未靜默吞掉）：")
+        print("⚠️ Degraded/abnormal (recorded explicitly, not silently swallowed):")
         for r in report.degraded_reasons:
             print(f"  - {r}")
     print()
@@ -59,9 +59,9 @@ def print_report(report: MatchReport, cfg: MatchConfig) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Agent Arena — 跑一局對戰")
-    ap.add_argument("--config", required=True, help="對戰設定 YAML")
-    ap.add_argument("--runs-dir", default="runs", help="transcript 輸出目錄")
+    ap = argparse.ArgumentParser(description="Agent Arena — run one match")
+    ap.add_argument("--config", required=True, help="match config YAML")
+    ap.add_argument("--runs-dir", default="runs", help="transcript output directory")
     args = ap.parse_args()
 
     with open(args.config, encoding="utf-8") as f:

@@ -1,19 +1,19 @@
-# 本機離線對戰：mock vs mock，不需金鑰、不需 Docker。
+# Local offline match: mock vs mock, no keys and no Docker needed.
 mode: quiz
 seed: 1
 ratings_path: runs/ratings.json
 mode_config:
   questions:
     - id: cap-jp
-      prompt: "日本的首都是哪座城市？"
-      answer: "東京"
+      prompt: "What is the capital of Japan?"
+      answer: "Tokyo"
       kind: contains
     - id: math-1
-      prompt: "17 乘以 23 等於多少？只回答數字。"
+      prompt: "What is 17 times 23? Answer with the number only."
       answer: "391"
       kind: numeric
     - id: logic-1
-      prompt: "A 比 B 高，B 比 C 高。三人中誰最矮？只回答一個字母。"
+      prompt: "A is taller than B, and B is taller than C. Who is the shortest? Answer with one letter only."
       answer: "C"
       kind: contains
 agents:
@@ -22,10 +22,10 @@ agents:
     model: mock-smart
     prompt_author: author-x
     params:
-      answers: ["東京", "391", "C"]
+      answers: ["Tokyo", "391", "C"]
   - id: beta
     adapter: mock
     model: mock-dumb
     prompt_author: author-y
     params:
-      answers: ["大阪", "390", "A"]
+      answers: ["Osaka", "390", "A"]

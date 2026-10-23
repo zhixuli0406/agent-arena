@@ -1,8 +1,8 @@
-# 對戰留痕（含完整靶機回應與 exploit 流量，視為敏感產物）
+# Match transcripts (full target responses and exploit traffic; treat as sensitive)
 runs/
 ratings.json
 
-# 本機金鑰，絕不入 repo
+# Local keys: never commit
 *.key
 *-key.json
 *credentials*.json

@@ -1,19 +1,19 @@
-# 日常任務對戰（含文件處理）：抽取、摘要、格式。mock 離線示範自動判分。
+# Everyday task match (including document handling): extraction, summary, formatting. Offline mock demo of automatic grading.
 mode: task
 seed: 1
 ratings_path: runs/ratings.json
 mode_config:
   tasks:
     - id: extract-emails
-      prompt: "從下面文字抽出所有 email，輸出成 JSON 陣列。"
-      context: "請聯絡 ann@a.com 或備援 bob@b.com，勿寄到舊信箱。"
+      prompt: "Extract every email address from the text below and output them as a JSON array."
+      context: "Please contact ann@a.com, or the backup bob@b.com. Do not write to the old mailbox."
       check: {kind: json_keys, min_items: 2}
     - id: summary
-      prompt: "用一句話摘要這段會議紀要的重點。"
-      context: "本季預算成長兩成，主因新客戶導入；人力維持不變。"
-      check: {kind: contains_all, values: ["預算", "客戶"]}
+      prompt: "Summarize the key point of these meeting notes in one sentence."
+      context: "Budget is up 20% this quarter, mainly from onboarding new clients; headcount stays the same."
+      check: {kind: contains_all, values: ["budget", "client"]}
     - id: date-format
-      prompt: "把『二〇二六年一月十五日』轉成 YYYY-MM-DD。"
+      prompt: "Convert 'January fifteenth, twenty twenty-six' to YYYY-MM-DD."
       check: {kind: regex, pattern: '\d{4}-\d{2}-\d{2}'}
 agents:
   - id: worker
@@ -23,11 +23,11 @@ agents:
     params:
       answers:
         - '["ann@a.com","bob@b.com"]'
-        - "重點：本季預算成長，來自新客戶導入。"
+        - "Key point: the budget grew this quarter, driven by onboarding new clients."
         - "2026-01-15"
   - id: sloppy
     adapter: mock
     model: mock-bad
     prompt_author: author-y
     params:
-      answers: ["沒有 email", "略", "一月十五"]
+      answers: ["no emails here", "n/a", "Jan 15"]

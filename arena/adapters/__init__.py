@@ -1,4 +1,4 @@
-"""Adapter 註冊表與工廠。加入新廠商＝在此註冊一個 adapter，引擎不動。"""
+"""Adapter registry and factory. Adding a vendor = registering an adapter here; the engine stays untouched."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from .codex_cli import CodexCLIAdapter
 from .grok_cli import GrokCLIAdapter
 from .mock import MockAdapter
 from .openai_compat import OpenAICompatAdapter
+from .remote import RemoteAdapter
 
 REGISTRY: dict[str, type[Adapter]] = {
     "mock": MockAdapter,
@@ -16,13 +17,14 @@ REGISTRY: dict[str, type[Adapter]] = {
     "codex_cli": CodexCLIAdapter,
     "grok_cli": GrokCLIAdapter,
     "openai_compat": OpenAICompatAdapter,
+    "remote": RemoteAdapter,  # player-supplied agents through one shared entry point (zero owner keys)
 }
 
 
 def build_adapter(spec: AgentSpec) -> Adapter:
     cls = REGISTRY.get(spec.adapter)
     if cls is None:
-        raise ValueError(f"未知 adapter：{spec.adapter}（可用：{', '.join(REGISTRY)}）")
+        raise ValueError(f"unknown adapter: {spec.adapter} (available: {', '.join(REGISTRY)})")
     return cls(spec)
 
 

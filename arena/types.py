@@ -1,4 +1,4 @@
-"""核心資料結構。跨元件溝通只靠這些型別，不走隱式共享狀態。"""
+"""Core data structures. Components talk to each other only through these types, never through implicit shared state."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any
 
 @dataclass
 class Usage:
-    """一次 adapter 動作的耗用。計分與斷路器都要讀。"""
+    """Resource usage of one adapter action. Read by both scoring and the circuit breaker."""
 
     input_tokens: int = 0
     output_tokens: int = 0
@@ -18,7 +18,7 @@ class Usage:
 
 @dataclass
 class Observation:
-    """代理這一回合看到的東西。"""
+    """What an agent sees this round."""
 
     round: int
     task: str
@@ -29,7 +29,7 @@ class Observation:
 
 @dataclass
 class Action:
-    """代理這一步要做的事。mode 負責詮釋 content。"""
+    """What an agent does this step. The mode interprets content."""
 
     content: str = ""
     usage: Usage = field(default_factory=Usage)
@@ -42,20 +42,20 @@ class Action:
 
 @dataclass
 class AgentSpec:
-    """一位參賽代理的設定。system_prompt 就是人類操盤手要調的東西。"""
+    """Configuration of one competing agent. system_prompt is what the human operator tunes."""
 
     id: str
     adapter: str
     model: str = ""
     system_prompt: str = ""
     prompt_author: str = "anon"
-    team: str = ""  # 組隊對戰用；空＝自由對戰（每個代理自成一隊）。引擎參賽者本為 list，N 人對戰已支援。
+    team: str = ""  # For team matches; empty = free-for-all (each agent is its own team). Participants are already a list, so N-player matches work.
     params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class Participant:
-    """執行期的參賽者：綁定 spec 與其 adapter 實例。"""
+    """A runtime participant: binds a spec to its adapter instance."""
 
     spec: AgentSpec
     adapter: Any = None  # adapters.base.Adapter
@@ -67,7 +67,7 @@ class Participant:
 
 @dataclass
 class Event:
-    """transcript 的一行。唯一真相來源。"""
+    """One line of the transcript. The single source of truth."""
 
     type: str
     round: int
@@ -93,6 +93,9 @@ class MatchConfig:
     timeout_seconds: float = 60.0
     seed: int = 0
     ratings_path: str = "ratings.json"
+    # Whether to update the team ladder (keyed by team name). Only meaningful for fixed-name team matches;
+    # the lobby's random red/blue split has different people every match, so recording under one team name is just noise.
+    team_ladder: bool = True
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> "MatchConfig":
@@ -110,10 +113,10 @@ class MatchConfig:
                 )
             )
         if not agents:
-            raise ValueError("agents 不可為空")
+            raise ValueError("agents must not be empty")
         ids = [a.id for a in agents]
         if len(set(ids)) != len(ids):
-            raise ValueError(f"agent id 必須唯一，出現重複：{ids}")
+            raise ValueError(f"agent ids must be unique, found duplicates: {ids}")
         return MatchConfig(
             mode=d["mode"],
             agents=agents,
@@ -123,4 +126,5 @@ class MatchConfig:
             timeout_seconds=d.get("timeout_seconds", 60.0),
             seed=d.get("seed", 0),
             ratings_path=d.get("ratings_path", "ratings.json"),
+            team_ladder=bool(d.get("team_ladder", True)),
         )

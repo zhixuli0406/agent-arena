@@ -1,77 +1,77 @@
-# 路線圖
+# Roadmap
 
-每個里程碑都附完成定義（DoD）。依 playbook：code 寫完不是完成，要 build 過、測試過、活體驗證過，文件同 commit 更新。
+Every milestone has a definition of done (DoD). Per the playbook, finished code is not done: it must build, pass tests, be verified live, and have its docs updated in the same commit.
 
-## M0 — 核心引擎垂直切片 ✅（已驗證 2026-10-22）
+## M0: core engine vertical slice ✅ (verified 2026-10-22)
 
-讓一局 quiz 對戰在本機端到端跑通。
+Run one quiz match end to end on the local machine.
 
-- [x] 專案骨架、README（READMEDD）、設計/安全/路線圖文件
-- [x] `types`：Observation / Action / MatchConfig / AgentSpec / Event / MatchResult
-- [x] Adapter：`base` + `mock`
-- [x] Mode：`base` + `quiz`（判題 exact/choice/contains/numeric，已修評審點名的子字串假陽性）
-- [x] Engine：主迴圈 + 三道斷路器 + JSONL 留痕（try/finally、transcript 0600）
-- [x] 雙軸 ELO 計分（賽前快照、order-invariant；狀態非 COMPLETE 跳過更新）
-- [x] CLI `arena.run` + 範例設定
-- [x] 測試（quiz 判題、斷路器、ELO 順序不變性）
-- **DoD**：✅ `python -m arena.run --config examples/quiz_mock.yaml` 跑出完整戰報；pytest 綠燈；本機實跑過。
+- [x] Project skeleton, README (README-driven development), design/safety/roadmap docs
+- [x] `types`: Observation / Action / MatchConfig / AgentSpec / Event / MatchResult
+- [x] Adapter: `base` + `mock`
+- [x] Mode: `base` + `quiz` (grading by exact/choice/contains/numeric; the substring false positive the reviewers flagged is fixed)
+- [x] Engine: main loop + three circuit breakers + JSONL logging (try/finally, transcript 0600)
+- [x] Two-axis ELO scoring (pre-match snapshot, order-invariant; updates skipped when status isn't COMPLETE)
+- [x] CLI `arena.run` + example configs
+- [x] Tests (quiz grading, circuit breakers, ELO order invariance)
+- **DoD**: ✅ `python -m arena.run --config examples/quiz_mock.yaml` produces a full match report; pytest green; run for real on the local machine.
 
-## M1 — 真實 adapter（部分完成）
+## M1: real adapters (partly done)
 
-- [x] `claude_cli`（本機 `claude -p` headless，stdin 傳 prompt、process group 回收、標記 host_actor）✅ 活體驗證
-- [x] `codex_cli`（本機 `codex exec`，真正的 OpenAI 代理，用其自身登入）✅ **Claude vs OpenAI 真實跨廠商對戰已實跑驗證**
-- [x] `grok_cli`（本機 `grok --prompt-file ... --output-format plain`，真正的 xAI Grok，用其自身登入）✅ **真實三方 Claude vs OpenAI vs Grok 已實跑驗證**
-- [x] 三家原生 CLI 皆零金鑰驅動（Claude/OpenAI/Grok）；`openai_compat` 仍保留給遠端相容端點（需金鑰）
-- [x] `openai_compat`（涵蓋 Grok / OpenAI / 相容端點，base_url 白名單校驗）— 已實作，**缺金鑰未活體驗證**
-- [x] usage（token/用時）回收進戰報
-- **DoD**：claude vs mock ✅ 已實跑；Grok vs Claude 待金鑰。無金鑰時以 mock 降級並明示 ✅。
+- [x] `claude_cli` (local `claude -p` headless, prompt over stdin, process group cleanup, marked host_actor) ✅ verified live
+- [x] `codex_cli` (local `codex exec`, a real OpenAI agent using its own login) ✅ **a real cross-vendor Claude vs OpenAI match has been run and verified**
+- [x] `grok_cli` (local `grok --prompt-file ... --output-format plain`, the real xAI Grok using its own login) ✅ **a real three-way Claude vs OpenAI vs Grok match has been run and verified**
+- [x] All three native CLIs run with zero keys (Claude/OpenAI/Grok); `openai_compat` is kept for remote compatible endpoints (needs a key)
+- [x] `openai_compat` (covers Grok / OpenAI / compatible endpoints, base_url allowlist validation): implemented, **not verified live for lack of a key**
+- [x] usage (tokens/time) collected into the match report
+- **DoD**: claude vs mock ✅ run for real; Grok vs Claude waits for a key. Without a key it degrades to mock and says so ✅.
 
-## M2 — 資安場與本機配置器 ✅（已驗證 2026-10-22）
+## M2: security arena and local provisioner ✅ (verified 2026-10-22)
 
-- [x] Provisioner `base` + `local`（Docker，runner sidecar 隔離模型，實測主機封閉/靶機無出網）
-- [x] `targets/allowlist.yaml` + 自帶 `arena-warmup` 靶機（Juice Shop/DVWA/WebGoat 已列白名單待接）
-- [x] `ctf` 模式：HTTP 工具（GET/POST/SUBMIT 嚴格文法）、常數時間 check_flag、首殺判定、請求預算
-- [x] 安全關卡 G1–G5 落地 + 測試（白名單拒絕、C1 宿主代理拒絕、隔離、DATA 圍欄）
-- **DoD**：✅ 本機 Docker 拉起靶機，mock 攻擊者透過引擎工具交 flag、散場自動拆除；CLI 戰報與 pytest 皆通過。
-- 待補：接 Juice Shop 等 OSS 靶機（映像較大、啟動較久）、attacker-container shell 模式（比 HTTP 更真實但隔離更複雜）。
+- [x] Provisioner `base` + `local` (Docker, runner sidecar isolation model; tested that the host is closed off and the target has no egress)
+- [x] `targets/allowlist.yaml` + the bundled `arena-warmup` target (Juice Shop/DVWA/WebGoat are allowlisted, not yet wired in)
+- [x] `ctf` mode: HTTP tools (strict GET/POST/SUBMIT grammar), constant-time check_flag, first blood, request budget
+- [x] Safety gates G1–G5 in place + tests (allowlist refusal, C1 host agent refusal, isolation, DATA fence)
+- **DoD**: ✅ local Docker starts the target, a mock attacker submits the flag through the engine tools, and teardown happens automatically at match end; the CLI match report and pytest both pass.
+- Still to do: wire in OSS targets such as Juice Shop (bigger images, slower start), and an attacker-container shell mode (more realistic than HTTP, but harder to isolate).
 
-## M3 — 雲端自動配置（靶機部署 ✅ 已驗證 2026-10-22）
+## M3: cloud auto-provisioning (target deployment ✅ verified 2026-10-22)
 
-> 使用者 2026-10-22 指示免費架站要「真正完全免費（免信用卡、不計費）」。Cloud Run 需綁卡＋超額計費，**非完全免費**，故以下 cloudrun 僅為選項之一；「真正免費 host」選型研究被 session 用量上限中斷（台北 12am 重置），待重跑。
-> 另註：cloudrun provider 為用量上限交棒期間由 codex 代筆，codex 宣稱已自測部署成功，但**尚未經本機逐行覆核**。
+> On 2026-10-22 the user asked for free hosting to be "truly, completely free (no credit card, no billing)". Cloud Run needs a card on file and bills overages, so it is **not completely free**, and the cloudrun work below is only one option. The research on choosing a "truly free host" was interrupted by the session usage limit (resets at 12am Taipei time) and is waiting to be rerun.
+> Also note: the cloudrun provider was written by codex during the handover while the usage limit was hit. codex says it tested the deployment successfully, but it **has not yet been reviewed line by line locally**.
 
-- [x] `cloudrun` provider：以 SA 把靶機部署成 Cloud Run 服務、identity token 呼叫、散場刪除；遇 IAM_PERMISSION_DENIED 停工回報（G6）
-- [x] 活體驗證：`arena.run --config examples/ctf_warmup_cloudrun.yaml` 真的部署→對戰→刪除，37.7s，無殘留
-- [x] **真正完全免費公開伺服器**：`infra/serve-free.sh` 用 Cloudflare quick tunnel（零帳號／零信用卡）一鍵把對戰伺服器對外公開 ✅ 已實測公開 `*.trycloudflare.com` 網址可達、開局、並服務像素遊戲
-- [ ] 持久免費 host 的 provider（Render，需你的免費帳號 API 金鑰）；或部署上 Cloud Run（非免費選項）
-- [ ] OSS 靶機（Juice Shop 等）上 Cloud Run 需先補 VPC egress 控制（目前 cloudrun 只收自架 self 靶機）
-- **DoD**：✅ 一道指令在 Cloud Run 免費額度內拉起靶機、跑完一局、自動拆除、用 SA 非互動登入。
+- [x] `cloudrun` provider: deploys the target as a Cloud Run service with an SA, calls it with an identity token, deletes it at match end; stops and reports on IAM_PERMISSION_DENIED (G6)
+- [x] Live verification: `arena.run --config examples/ctf_warmup_cloudrun.yaml` really deploys → plays → deletes, 37.7s, nothing left behind
+- [x] **Truly free public server**: `infra/serve-free.sh` uses a Cloudflare quick tunnel (no account, no credit card) to put the match server online with one command ✅ tested: the public `*.trycloudflare.com` URL is reachable, starts matches, and serves the pixel game
+- [ ] Provider for a persistent free host (Render, needs your free account API key); or deploy to Cloud Run (not a free option)
+- [ ] OSS targets (Juice Shop etc.) on Cloud Run need VPC egress control first (cloudrun currently only accepts self-hosted self targets)
+- **DoD**: ✅ one command starts a target within the Cloud Run free tier, plays a match, tears it down automatically, and logs in non-interactively with an SA.
 
-## M4 — 對戰伺服器與像素遊戲前端
+## M4: match server and pixel game front end
 
-- [x] FastAPI 對戰伺服器 `server/app.py`：開局、SSE 即時串流 transcript、查結果、托管前端 ✅ 本機實跑驗證
-- [~] 像素型遊戲前端 `web/arena.html`：把對局演成 8-bit 復古對戰（fork 進行中；受限流影響，狀態待確認）
-- [ ] 提示詞提交介面（操盤手上傳 strategy prompt）
-- **DoD**：瀏覽器即時觀戰一局、看到像素演出與雙軸排行；視覺無跑版。
+- [x] FastAPI match server `server/app.py`: start matches, live SSE transcript streaming, results, serves the front end ✅ run and verified locally
+- [~] Pixel game front end `web/arena.html`: plays a match out as an 8-bit retro battle (fork in progress; affected by rate limiting, status to be confirmed)
+- [ ] Prompt submission UI (operators upload a strategy prompt)
+- **DoD**: watch a match live in the browser, with pixel animation and both rating axes; no layout breakage.
 
-## M6 — 配對、房間與多人/組隊（2026-10-22 使用者追加）
+## M6: matchmaking, rooms, multiplayer and teams (added by the user 2026-10-22)
 
-- [x] `AgentSpec.team` 欄位；引擎參賽者本為 list → N 人對戰結構已支援
-- [x] 隨機配對 `/api/queue`：同 mode 湊滿人數自動開賽 ✅ 本機實測
-- [x] 私人房間 `/api/rooms`（建房碼、加入、房主開賽）✅ 本機實測
-- [x] 多對多與組隊：`team` 分組、團隊聚合計分、團隊 ELO（team 軸，order-invariant）✅ 2v2 本機實測
-- [ ] 把房間/配對/組隊接進像素遊戲前端（目前為 API 層，前端 UI 待接）
-- **DoD**：✅ API 已可建房邀友/隨機配對/2v2 組隊並正確團隊計分；⏳ 瀏覽器端介面待接。
+- [x] `AgentSpec.team` field; the engine's participants were already a list → N-player matches are supported
+- [x] Random matchmaking `/api/queue`: a match starts automatically once enough players for the same mode have joined ✅ tested locally
+- [x] Private rooms `/api/rooms` (room code, join, host starts) ✅ tested locally
+- [x] Many-vs-many and teams: `team` grouping, aggregated team scoring, team ELO (team axis, order-invariant) ✅ 2v2 tested locally
+- [ ] Wire rooms/matchmaking/teams into the pixel game front end (currently API only; the front-end UI is not wired up yet)
+- **DoD**: ✅ the API can create rooms to invite friends, matchmake at random, and run 2v2 teams with correct team scoring; ⏳ the browser UI is not wired up yet.
 
-## M5 — 收尾
+## M5: wrap-up
 
-- [ ] `swe` / `debate` 模式
-- [ ] 授權條款拍板（擁有者決定）
-- [ ] 發佈決策（擁有者決定）
-- **DoD**：擁有者親測放行。
+- [ ] `swe` / `debate` modes
+- [ ] License decision (owner decides)
+- [ ] Release decision (owner decides)
+- **DoD**: the owner tests it and signs off.
 
-## 待拍板（擁有者關卡）
+## Pending decisions (owner gates)
 
-- 授權條款（MIT / Apache-2.0 / 私有）
-- 是否公開發佈、用什麼名義
-- v1 先做哪些對戰類型的優先序
+- License (MIT / Apache-2.0 / proprietary)
+- Whether to release publicly, and under what name
+- Priority order of match types for v1

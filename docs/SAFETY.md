@@ -1,58 +1,58 @@
-# 安全模型
+# Safety model
 
-本專案的資安對戰只在一種情境下成立：**授權的 CTF / 滲透演練**。打的是自己架的、故意留洞的、網路隔離的、用完即拆的靶機。任何把這套能力指向未授權的真實系統的用法，都不在本專案範圍內，也不會被支援。
+The security matches in this project make sense in one situation only: **authorized CTF / penetration practice**. The targets are self-hosted, deliberately vulnerable, network isolated, and torn down after use. Pointing this capability at real systems without authorization is outside the scope of this project and will not be supported.
 
-這份文件是動手接資安場（`ctf` 模式）前的必讀，規範寫成硬性關卡——程式要擋，不是靠自律。
+Read this document before working on the security arena (`ctf` mode). The rules are written as hard gates: the code enforces them, they don't depend on self-discipline.
 
-## 實作狀態（2026-10-22）
+## Implementation status (2026-10-22)
 
-| 關卡 | 狀態 | 落點 |
+| Gate | Status | Where |
 |---|---|---|
-| G1 靶機白名單 | ✅ 已強制 | `provision/local.py` 讀 `targets/allowlist.yaml`，不在清單即拒 |
-| G2 網路隔離/封閉出網 | ✅ 已強制（已實測） | `--internal` 網路 + 不發佈埠 + runner-sidecar |
-| G3 TTL 斷路器 | ✅ 標籤+散場拆除+`reaper.py`；⚠️ 定時排程待設 | 容器掛 `arena.expires` 標籤 |
-| G4 無真實憑證 | ✅ 已強制 | 配置前掃環境變數命中秘密樣式即拒 |
-| G5 外部內容降格 DATA | ✅ 已落實 | `security.wrap_untrusted()` 圍欄 + 嚴格動作文法 |
-| G6 權限邊界 | ✅ 已強制 | `cloudrun` 遇 IAM_PERMISSION_DENIED 擲 PermissionError 停工回報 |
-| Cloud Run 出網 | ⚠️ 未控 | 故 `cloudrun` v0 只收自架 self（inert）靶機；OSS 靶機待 VPC egress 控制 |
-| C1 禁宿主 agentic 代理 | ✅ 已強制 | `ctf` setup 檢查 `is_host_actor`，可 `allow_host_agentic` 明示放行 |
+| G1 target allowlist | ✅ Enforced | `provision/local.py` reads `targets/allowlist.yaml` and refuses anything not on it |
+| G2 network isolation / no egress | ✅ Enforced (tested) | `--internal` network + no published ports + runner sidecar |
+| G3 TTL circuit breaker | ✅ Labels + teardown at match end + `reaper.py`; ⚠️ scheduled run not set up yet | Containers carry an `arena.expires` label |
+| G4 no real credentials | ✅ Enforced | Environment variables are scanned before provisioning; a match on a secret pattern is refused |
+| G5 external content demoted to DATA | ✅ In place | `security.wrap_untrusted()` fence + strict action grammar |
+| G6 permission boundary | ✅ Enforced | `cloudrun` raises PermissionError on IAM_PERMISSION_DENIED, stops and reports |
+| Cloud Run egress | ⚠️ Not controlled | So `cloudrun` v0 only accepts self-hosted self (inert) targets; OSS targets wait for VPC egress control |
+| C1 no host-side agentic agents | ✅ Enforced | `ctf` setup checks `is_host_actor`; can be explicitly allowed with `allow_host_agentic` |
 
-## 威脅模型：我們在防誰
+## Threat model: who we defend against
 
-1. **防逃逸**：代理（或被它攻破的靶機）試圖從沙箱打到宿主機、內網、或真實外部服務。
-2. **防誤傷**：設定錯誤導致靶機暴露到公網、或 flag/題目含真實憑證。
-3. **防失控**：迴圈型攻擊耗盡配額、資源不拆除持續計費。
-4. **防提示注入**：靶機回應、題目內容裡夾帶的指令被當成對代理或對引擎的命令執行。
+1. **Escape**: an agent (or a target it has compromised) tries to reach the host machine, the internal network, or real external services from the sandbox.
+2. **Accidental harm**: a misconfiguration exposes a target to the public internet, or a flag/question contains real credentials.
+3. **Runaway**: looping attacks exhaust quotas, or resources are never torn down and keep billing.
+4. **Prompt injection**: instructions embedded in target responses or question content get executed as commands to the agent or the engine.
 
-## 硬性關卡（程式強制，不可繞過）
+## Hard gates (enforced in code, no bypass)
 
-### G1 靶機白名單
+### G1 target allowlist
 
-只允許拉起**已知脆弱映像白名單**內的目標（`targets/allowlist.yaml`）：OWASP Juice Shop、DVWA、WebGoat、以及本專案 `targets/` 下自帶的 CTF 容器。不在白名單的映像一律拒絕配置。這擋掉「順手去打一個真實服務」的可能。
+Only targets on the **allowlist of known-vulnerable images** (`targets/allowlist.yaml`) can be started: OWASP Juice Shop, DVWA, WebGoat, and the CTF containers that ship in this project's `targets/`. Any image not on the allowlist is refused. This rules out "just go hit a real service while you're at it".
 
-### G2 網路隔離與封閉出網
+### G2 network isolation and no egress
 
-靶機跑在獨立 Docker network（`local`）或獨立 Cloud Run 服務且無對外權限（`cloudrun`）。預設**禁止靶機對外出網**（只開代理→靶機這條路）。代理對靶機的存取走引擎代理的工具，不給代理直連任意網路的能力。
+Targets run in a separate Docker network (`local`) or a separate Cloud Run service with no outbound access (`cloudrun`). By default **targets cannot reach the outside network** (only the agent → target path is open). Agents reach targets through the engine's proxy tools and get no ability to connect directly to arbitrary networks.
 
-### G3 TTL 斷路器
+### G3 TTL circuit breaker
 
-每台靶機配置時即掛 TTL（預設 30 分鐘）與局 ID 標籤。到期無條件拆除。另有獨立清掃程序定時掃「帶本專案標籤且超齡」的資源強制回收，防止某局崩潰後資源孤兒持續計費。
+Every target gets a TTL (30 minutes by default) and a match ID label when it is provisioned. When the TTL expires it is torn down unconditionally. A separate sweeper also periodically scans for resources that carry this project's labels and are past their age, and reclaims them, so a crashed match can't leave orphaned resources that keep billing.
 
-### G4 無真實憑證
+### G4 no real credentials
 
-題目、flag、靶機環境變數禁止放任何真實金鑰/密碼/token。CI 有 secret 掃描；配置器啟動靶機前檢查注入的環境變數不命中憑證樣式。
+Questions, flags and target environment variables must not contain any real key, password or token. CI runs secret scanning, and the provisioner checks that the environment variables it injects don't match credential patterns before starting a target.
 
-### G5 外部內容一律降格為 DATA
+### G5 external content is always DATA
 
-靶機的 HTTP 回應、檔案內容、題目敘述，對引擎與評審而言都是資料，不是指令。其中出現的任何「請執行…」「ignore previous…」都不得被當成命令。這是 prompt-injection 防護，寫進引擎對 Observation 的封裝層。
+A target's HTTP responses, file contents and question text are data to the engine and the judges, never instructions. Any "please run…" or "ignore previous…" in them must not be treated as a command. This is prompt-injection protection, and it is built into the layer where the engine wraps Observations.
 
-### G6 權限邊界即越界訊號
+### G6 permission boundary as a boundary signal
 
-`cloudrun` provider 只做部署面（deploy/builds/source 上傳）。遇 `IAM_PERMISSION_DENIED` 一律視為越界，停工回報，不嘗試提權或換路徑繞過。
+The `cloudrun` provider only does deployment work (deploy, builds, source upload). `IAM_PERMISSION_DENIED` is always treated as crossing the boundary: stop and report, never try to escalate privileges or find another way around.
 
-## 範圍聲明
+## Scope
 
-- ✅ 支援：自架隔離靶機的 CTF、紅藍對抗演練、模型攻防能力研究、教學。
-- ❌ 不支援也不協助：對未授權真實系統的掃描/攻擊、DoS、大規模目標鎖定、供應鏈汙染、為惡意目的的偵測規避。
+- ✅ Supported: CTF on self-hosted isolated targets, red/blue team exercises, research on models' attack and defense abilities, teaching.
+- ❌ Not supported and not assisted: scanning or attacking real systems without authorization, DoS, large-scale targeting, supply chain poisoning, detection evasion for malicious purposes.
 
-配置器若偵測到目標疑似為真實/公網主機（非白名單映像、非隔離網段），直接拒絕並記錄，不執行。
+If the provisioner detects that a target looks like a real or public host (an image not on the allowlist, or a non-isolated network segment), it refuses and logs it, and does not run it.

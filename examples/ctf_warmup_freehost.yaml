@@ -1,5 +1,5 @@
-# 資安場靶機架在「免費空間」：Docker 跑暖身靶機 + Cloudflare tunnel 公開（零帳號零卡）。
-# 需 docker 與 cloudflared，且先建映像：docker build -t arena-warmup targets/warmup
+# CTF target on free hosting: Docker runs the warmup target, a Cloudflare tunnel makes it public (no account, no card).
+# Needs docker and cloudflared; build the image first: docker build -t arena-warmup targets/warmup
 mode: ctf
 seed: 1
 ratings_path: runs/ratings.json

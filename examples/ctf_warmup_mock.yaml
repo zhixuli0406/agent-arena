@@ -1,6 +1,6 @@
-# 本機資安場：mock 攻擊者 vs 暖身靶機（arena-warmup）。
-# 需 docker，且先建映像：docker build -t arena-warmup targets/warmup
-# recon 腳本化示範「讀 robots.txt → 找到隱藏路徑 → 交 flag」；flailer 亂打對照。
+# Local CTF match: mock attackers vs the warmup target (arena-warmup).
+# Needs docker; build the image first: docker build -t arena-warmup targets/warmup
+# recon is scripted to show "read robots.txt → find the hidden path → submit the flag"; flailer guesses at random for contrast.
 mode: ctf
 seed: 1
 ratings_path: runs/ratings.json
