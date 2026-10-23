@@ -74,16 +74,13 @@ function pollRoom() {
     }
   }, 1500);
 }
-function renderRoom(r) {
-  if (!r || !Array.isArray(r.members)) return;
-  S.roomView = r;
-  $("rSetup").classList.add("hide"); $("rRoom").classList.remove("hide");
-  $("rCodeBig").textContent = r.code;
-  $("rInfo").textContent = t("r_info", { m: modeName(r.mode), n: r.members.length, s: r.size });
-  const ranked = r.ranked === true;
-  const rk = $("rRanked"); rk.className = "tag " + (ranked ? "ranked" : "unranked"); rk.textContent = t(ranked ? "r_ranked" : "r_unranked");
-  const isHost = r.host === S.pid, me = r.members.find(m => m.id === S.pid);
-  const box = $("rSlots"); box.replaceChildren();
+// The room is polled every 1.5 s: rebuild the slots only when something changed, so a button under the
+// cursor (kick) isn't swapped out between press and release.
+function renderSlots(r, isHost) {
+  const box = $("rSlots");
+  const key = JSON.stringify([r.members, r.host, r.status, r.size, window.I18N.lang()]);
+  if (box.dataset.key === key && box.childElementCount) return;
+  box.dataset.key = key; box.replaceChildren();
   r.members.forEach(m => {
     const s = node("div", "slot"); s.appendChild(ava(m.name));
     const n = node("div", "pn", m.name);
@@ -98,6 +95,17 @@ function renderRoom(r) {
     box.appendChild(s);
   });
   for (let i = r.members.length; i < r.size; i++) box.appendChild(node("div", "slot empty", t("sl_empty")));
+}
+function renderRoom(r) {
+  if (!r || !Array.isArray(r.members)) return;
+  S.roomView = r;
+  $("rSetup").classList.add("hide"); $("rRoom").classList.remove("hide");
+  $("rCodeBig").textContent = r.code;
+  $("rInfo").textContent = t("r_info", { m: modeName(r.mode), n: r.members.length, s: r.size });
+  const ranked = r.ranked === true;
+  const rk = $("rRanked"); rk.className = "tag " + (ranked ? "ranked" : "unranked"); rk.textContent = t(ranked ? "r_ranked" : "r_unranked");
+  const isHost = r.host === S.pid, me = r.members.find(m => m.id === S.pid);
+  renderSlots(r, isHost);
   $("btnStart").classList.toggle("hide", !isHost || r.status !== "open"); $("btnReady").classList.toggle("hide", isHost || r.status !== "open");
   $("btnReady").textContent = me && me.ready ? t("btn_unready") : t("btn_ready");
   const allReady = r.members.length >= 2 && r.members.every(m => m.ready); $("btnStart").disabled = !allReady;

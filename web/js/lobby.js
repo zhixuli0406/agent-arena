@@ -120,6 +120,7 @@ function stopFlash() { if (titleTimer) { clearInterval(titleTimer); titleTimer =
 document.addEventListener("visibilitychange", () => { if (!document.hidden) stopFlash(); });
 
 /* ---------- server discovery, health, stats ---------- */
+let autoServer = false;            // the server came from server.json, so it may rotate (free tunnel every 5 hours)
 async function discover() {
   const fromUrl = qs("api");
   if (fromUrl) { const v = safeApi(fromUrl); if (v) { S.server = v; return; } }
@@ -128,7 +129,7 @@ async function discover() {
   for (const p of ["../server.json", "server.json"]) {
     try {
       const r = await fetch(p, { cache: "no-store" });
-      if (r.ok) { const j = await r.json(); const v = j && safeApi(j.server); if (v) { S.server = v; return; } }
+      if (r.ok) { const j = await r.json(); const v = j && safeApi(j.server); if (v) { S.server = v; autoServer = true; return; } }
     } catch (_) { /* try next */ }
   }
 }
@@ -142,11 +143,20 @@ async function health() {
   try { await api("GET", "/api/health"); setSrv("on"); return true; }
   catch (e) { if (e.status === 429) return true; setSrv("off"); return false; }
 }
-let statsPause = 0;
+let statsPause = 0, lastRediscover = 0;
 async function stats() {
   if (Date.now() < statsPause) return;
   try { S.stats = await api("GET", "/api/lobby/stats"); $("stOnline").textContent = fmtNum(S.stats.online); setSrv("on"); }
-  catch (e) { if (e.status === 429) { statsPause = Date.now() + e.retryAfter * 1000; return; } setSrv("off"); }
+  catch (e) {
+    if (e.status === 429) { statsPause = Date.now() + e.retryAfter * 1000; return; }
+    setSrv("off");
+    // The free server's URL rotates: an open page re-reads server.json instead of staying stuck on a dead URL
+    if (autoServer && Date.now() - lastRediscover > 20000) {
+      lastRediscover = Date.now();
+      const old = S.server; await discover();
+      if (S.server !== old) { L.hooks.lang.forEach(f => f()); stats(); }
+    }
+  }
 }
 
 /* ---------- identity ---------- */
@@ -200,6 +210,7 @@ const TABS = ["quick", "room", "watch", "rank", "connect"];
 let currentTab = "quick", inMatchView = false;
 function openTab(tab) {
   currentTab = tab; inMatchView = false;
+  $("enter").classList.toggle("hide", !!S.pid);
   document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
   TABS.forEach(x => $("tab-" + x).classList.toggle("hide", x !== tab));
   $("matchView").classList.add("hide");
@@ -208,6 +219,7 @@ function openTab(tab) {
 }
 function showMatchView() {
   inMatchView = true;
+  $("enter").classList.add("hide");          // spectators who haven't entered: the match takes the whole screen
   TABS.forEach(x => $("tab-" + x).classList.add("hide"));
   document.querySelectorAll(".tab").forEach(b => b.classList.remove("on"));
   $("matchView").classList.remove("hide"); $("btnBackMatch").classList.add("hide");

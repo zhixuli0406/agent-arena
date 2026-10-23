@@ -59,6 +59,9 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - **A real three-way cross-vendor match has been run and verified: Claude vs OpenAI vs Grok** (all three answered correctly, about 16–18s), with zero keys.
 
 ### Fixed
+- An open lobby page no longer stays "offline" when the free server rotates its URL (every 5 hours): after a failed check it re-reads `server.json` (at most every 20 s) and switches to the new server.
+- Spectating without entering the lobby: the match view now takes the whole screen instead of sitting under the sign-in form.
+- Custom room slots are rebuilt only when the room changes, so a Kick button isn't replaced by the 1.5 s poll between press and release.
 - Ladder file "later write overwrites earlier write" when several matches end at once: settlement now re-reads the latest file before updating.
 - Question delivery switched to state broadcast: when the browser reconnected on its own, a leftover connection would eat the question or the end signal (caught in headless browser testing).
 - Two races in browser answering: if the response to a submitted answer arrived after the next question or after the end signal, the next question was wrongly marked as answered or the end screen was overwritten.
