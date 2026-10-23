@@ -160,11 +160,19 @@ async function health() {
   catch (e) { if (e.status === 429) return true; setSrv("off"); return false; }
 }
 let statsPause = 0, lastRediscover = 0;
+function setOnlineCount(value) {
+  const n = Number(value), ok = value !== null && Number.isFinite(n) && n >= 0;
+  const count = ok ? Math.floor(n) : 0;
+  const next = ok ? fmtNum(count) : "–";
+  if ($("stOnline").textContent !== next) $("stOnline").textContent = next;
+  $("onlineDot").className = "dot" + (ok ? " on" : "");
+}
 async function stats() {
   if (Date.now() < statsPause) return;
-  try { S.stats = await api("GET", "/api/lobby/stats"); $("stOnline").textContent = fmtNum(S.stats.online); setSrv("on"); }
+  try { S.stats = await api("GET", "/api/lobby/stats"); setOnlineCount(S.stats.online); setSrv("on"); }
   catch (e) {
     if (e.status === 429) { statsPause = Date.now() + e.retryAfter * 1000; return; }
+    setOnlineCount(null);
     setSrv("off");
     // The free server's URL rotates: an open page re-reads server.json instead of staying stuck on a dead URL
     if (autoServer && Date.now() - lastRediscover > 20000) {

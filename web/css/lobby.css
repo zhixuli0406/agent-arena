@@ -53,6 +53,8 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em;bac
 .pill{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border:1px solid var(--line);border-radius:999px;
   font-size:13px;color:var(--ink-2);white-space:nowrap;background:var(--bg-1)}
 .pill b{font-family:var(--display);font-size:16px;font-weight:800;color:var(--ink)}
+.online-pill{border-color:oklch(0.76 0.15 145 / .28)}
+.online-pill b{font-variant-numeric:tabular-nums;min-width:1ch;text-align:center}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
 .dot.on{background:var(--good);box-shadow:0 0 0 3px oklch(0.76 0.15 145 / .18)}
 .dot.off{background:var(--bad)}
@@ -349,7 +351,7 @@ details.agent summary{cursor:pointer;font-weight:700}
 
 /* ---------- responsive ---------- */
 /* keep the header on one line: drop the secondary pills before anything overflows */
-@media (max-width:1280px){ #srvChip span:not(.dot){display:none} #srvChip{padding:0 10px} .hdr .pill.opt:not(#srvChip){display:none} }
+@media (max-width:1280px){ #srvChip span:not(.dot){display:none} #srvChip{padding:0 10px} .online-pill .online-label{display:none} .online-pill{padding:0 10px} }
 @media (max-width:1100px){ .tab{padding:0 10px;font-size:16px} .me .sub{display:none} }
 @media (max-width:1020px){
   .play,.match{grid-template-columns:1fr}
@@ -370,7 +372,7 @@ details.agent summary{cursor:pointer;font-weight:700}
   .tab{font-size:12px;letter-spacing:.03em;padding:6px 2px;display:grid;place-items:center;align-content:center;gap:2px;line-height:1.05}
   .tab .ico{display:block;font-size:17px}
   .tab.on::after{left:25%;right:25%;top:0;bottom:auto}
-  .pill.opt,.me .sub,.me .nm,.me .ava{display:none}
+  #srvChip,.me .sub,.me .nm,.me .ava{display:none}
   .me{padding:4px 8px}
   .shell{padding:18px 12px 0}
   .choices,.fmts,.cols{grid-template-columns:1fr}

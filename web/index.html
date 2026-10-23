@@ -48,7 +48,9 @@
     <button class="live-back hide" id="btnBackMatch" data-i18n="back_match">Live match</button>
     <span class="pill agent hide" id="agentPill"><span class="dot" id="agentDot"></span><span id="agentText" data-i18n="agent_off">Agent offline</span></span>
     <span class="pill opt" id="srvChip"><span class="dot" id="srvDot"></span><span id="srvText" data-i18n="srv_wait">Connecting</span></span>
-    <span class="pill opt"><span data-i18n="st_online">Online</span> <b id="stOnline">–</b></span>
+    <span class="pill online-pill" id="onlinePill" role="status" aria-live="polite">
+      <span class="dot" id="onlineDot" aria-hidden="true"></span><span class="online-label" data-i18n="st_online">Online now</span> <b id="stOnline">–</b>
+    </span>
     <span id="langHost"></span>
     <button class="iconbtn" id="btnSettings" aria-haspopup="true" aria-expanded="false" data-i18n-aria="set_h" aria-label="Settings">⚙</button>
     <div class="me hide" id="mePanel">
