@@ -206,15 +206,29 @@
 
   <!-- MATCH (own match or spectating) -->
   <section class="screen hide" id="matchView">
-    <div class="result hide" id="result" role="status">
-      <div class="kicker" id="resKicker"></div>
-      <div class="big" id="resTitle"></div>
-      <div class="row" style="align-items:baseline;gap:18px;margin-top:6px">
-        <div class="delta hide" id="resDelta"><span id="resDeltaN"></span><small id="resRating"></small></div>
+    <div class="result hide" id="result" role="status" aria-live="polite">
+      <div class="result-scene" id="resScene" aria-hidden="true">
+        <div class="honor-mark"><i></i><span>V</span><i></i></div>
+        <div class="honor-line"></div>
       </div>
-      <div class="mine" id="resMine"></div>
-      <div class="note" id="resSub"></div>
-      <div class="row">
+      <div class="result-grid">
+        <div class="result-copy">
+          <div class="kicker" id="resKicker"></div>
+          <div class="big" id="resTitle"></div>
+          <div class="champion" id="resChampion"></div>
+          <div class="moment" id="resMoment"></div>
+          <div class="row result-rating">
+            <div class="delta hide" id="resDelta"><span id="resDeltaN"></span><small id="resRating"></small></div>
+          </div>
+          <div class="mine" id="resMine"></div>
+          <div class="note" id="resSub"></div>
+        </div>
+        <div class="result-standings">
+          <div class="kicker" data-i18n="res_final">Final standings</div>
+          <ol class="podium" id="resPodium"></ol>
+        </div>
+      </div>
+      <div class="result-actions">
         <button class="btn" id="btnAgain" data-i18n="btn_again">Play again</button>
         <button class="btn ghost" id="btnLobby" data-i18n="btn_lobby">Back to lobby</button>
       </div>
@@ -242,7 +256,7 @@
         <div class="help mono" id="bMeta"></div>
         <div class="winline hide" id="bWin"></div>
         <div id="bRows" style="margin-top:8px"></div>
-        <div class="feed" id="bFeed"></div>
+        <div class="feed" id="bFeed" role="log" aria-live="polite"></div>
       </section>
     </div>
   </section>

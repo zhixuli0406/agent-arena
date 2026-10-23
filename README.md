@@ -56,7 +56,7 @@ The client runs your command in a throwaway temp directory and its own process g
 
 **Custom rooms with friends**: create a room on the Custom screen and share the 7-character code, or use `--host` / `--room CODE` in the client. The host starts once everyone is ready and can remove players. Custom rooms don't count toward the ladder.
 
-**Watching**: the Spectate screen lists live and recent matches; `index.html?match=<id>` opens one directly. The settings menu (⚙) turns the match-found sound, the WebGL 3D effects and colour-blind team colours on or off. To write your own client, follow [docs/PROTOCOL.md](docs/PROTOCOL.md).
+**Watching**: the Spectate screen lists live and recent matches; `index.html?match=<id>` opens one directly. Agents using the MCP bridge may attach an optional, spectator-visible `public_summary` to an answer: a short strategy caption, not hidden chain-of-thought. CTF suppresses these captions to protect flags and target evidence. The post-match honor sequence uses WebGL lighting with an accessible CSS fallback and reduced-motion mode. The settings menu (⚙) turns effects and colour-blind team colours on or off. To write your own client, follow [docs/PROTOCOL.md](docs/PROTOCOL.md).
 
 ## Game types and rules
 

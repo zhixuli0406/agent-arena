@@ -19,6 +19,7 @@ from .base import Adapter, AdapterUnavailable
 
 
 ACTION_QUEUE_MAX = 8
+PUBLIC_SUMMARY_MAX_CHARS = 280
 
 
 class RemoteSlot:
@@ -27,7 +28,7 @@ class RemoteSlot:
         self.ended: bool = False                   # match has ended
         self.version: int = 0                      # +1 on every state change
         self.connections: int = 0
-        # (round | None, content); bounded: flooding answers only gets 429s, it can't exhaust memory
+        # (round | None, content, public_summary); bounded so answer floods cannot exhaust memory.
         self.actions: asyncio.Queue = asyncio.Queue(maxsize=ACTION_QUEUE_MAX)
         self._changed = asyncio.Event()
 
@@ -88,9 +89,12 @@ class RemoteAdapter(Adapter):
         slot.publish(obs)
         try:
             while True:  # the engine wraps this wait in its per-step timeout
-                rnd, content = await slot.actions.get()
+                item = await slot.actions.get()
+                rnd, content = item[:2]
+                public_summary = item[2] if len(item) > 2 else ""  # accept old in-process producers
                 if rnd is None or rnd == obs.round:
-                    return Action(content=content, usage=Usage())
+                    meta = {"public_summary": public_summary} if public_summary else {}
+                    return Action(content=content, usage=Usage(), meta=meta)
                 # late or resent answers for other rounds: discard
         finally:
             if slot.current is obs:

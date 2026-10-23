@@ -1,10 +1,11 @@
 /* WebGL game feel for the lobby, no libraries (the CSP only allows our own scripts).
  *  - #fxBg: a full-screen shader: an arena floor grid running to the horizon, light beams and haze.
  *    It reacts to lobby state: idle, searching (faster + pulsing), found (shockwave), match (team tint).
- *  - #fxTop: an additive particle layer for bursts (correct answer, match found, victory).
+ *  - #fxTop: an additive particle layer for compact gameplay feedback (correct answer, match found).
+ *    Victory uses a cinematic shader ceremony instead of confetti.
  * Falls back to the CSS background (body.nofx) when WebGL is missing, the user turns effects off,
  * or the system asks for reduced motion (then we draw one still frame and no particles).
- * API: window.FX = { mode, pulse, team, burst, burstAt, setCb, enable, enabled }
+ * API: window.FX = { mode, ceremony, pulse, team, burst, burstAt, setCb, enable, enabled }
  */
 (function () {
 "use strict";
@@ -40,8 +41,8 @@ function context(canvas, opts) {
 const BG_VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
 const BG_FS = `
 precision mediump float;
-uniform vec2 res; uniform float t, travel, pulse, wave, team, mode;
-uniform vec3 cSig, cRed, cBlue;
+uniform vec2 res; uniform float t, travel, pulse, wave, team, mode, ceremony;
+uniform vec3 cSig, cRed, cBlue, cGold;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
   return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
@@ -82,8 +83,18 @@ void main(){
   }
   // horizon glow line
   c+=cSig*exp(-abs(uv.y-hz)*55.)*(0.35+0.4*pulse);
-  // result tint
-  if(mode>3.5&&mode<4.5){ c+=vec3(0.04,0.09,0.04)*sky; }
+  // Victory ceremony: one restrained focal light, expanding seal and architectural light columns.
+  if(mode>3.5&&mode<4.5){
+    float reveal=smoothstep(0.,0.55,ceremony);
+    vec2 h=uv-vec2(0.5,0.59); h.x*=asp;
+    float halo=exp(-dot(h,h)*7.5);
+    float ring=exp(-abs(length(h)-mix(0.04,0.43,reveal))*62.)*(1.-smoothstep(0.72,1.,ceremony));
+    float spokes=pow(abs(cos(atan(h.y,h.x)*8.)),34.)*smoothstep(0.62,0.08,length(h));
+    float columns=pow(max(0.,cos((uv.x-0.5)*31.4)),46.)*smoothstep(0.1,0.86,uv.y);
+    c*=mix(1.,0.68,reveal*0.48);
+    c+=cGold*(halo*0.17*reveal+ring*0.72+spokes*0.07*reveal+columns*0.055*reveal);
+    c+=cGold*exp(-abs(uv.y-0.59)*95.)*0.28*reveal;
+  }
   if(mode>4.5){ c*=0.82; }
   // vignette
   vec2 v=uv-0.5; v.x*=asp*0.7;
@@ -91,7 +102,8 @@ void main(){
   gl_FragColor=vec4(c,1.);
 }`;
 
-const bg = { gl: null, prog: null, loc: {}, travel: 0, pulse: 0, wave: 0, mode: 0, team: 0, last: 0, raf: 0 };
+const bg = { gl: null, prog: null, loc: {}, travel: 0, pulse: 0, wave: 0, mode: 0, team: 0,
+  ceremony: 0, ceremonyStart: 0, last: 0, raf: 0 };
 function bgInit() {
   const canvas = document.getElementById("fxBg");
   const gl = canvas && context(canvas, { alpha: false });
@@ -102,7 +114,7 @@ function bgInit() {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   gl.useProgram(bg.prog);
   const p = gl.getAttribLocation(bg.prog, "p"); gl.enableVertexAttribArray(p); gl.vertexAttribPointer(p, 2, gl.FLOAT, false, 0, 0);
-  for (const n of ["res", "t", "travel", "pulse", "wave", "team", "mode", "cSig", "cRed", "cBlue"]) bg.loc[n] = gl.getUniformLocation(bg.prog, n);
+  for (const n of ["res", "t", "travel", "pulse", "wave", "team", "mode", "ceremony", "cSig", "cRed", "cBlue", "cGold"]) bg.loc[n] = gl.getUniformLocation(bg.prog, n);
   canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); cancelAnimationFrame(bg.raf); bg.gl = null; });
   canvas.addEventListener("webglcontextrestored", () => { if (bgInit()) bgLoop(); });
   return true;
@@ -119,13 +131,15 @@ function bgDraw(now) {
   bg.travel += dt * SPEED[bg.mode];
   bg.pulse = Math.max(0, bg.pulse - dt * 0.9);
   if (bg.mode === 1) bg.pulse = Math.max(bg.pulse, 0.25 + 0.25 * Math.sin(now / 260));
+  bg.ceremony = bg.mode === 4 ? (reduced ? 1 : Math.min(1, Math.max(0, (now - bg.ceremonyStart) / 1500))) : 0;
   if (bg.wave > 0) { bg.wave += dt * 0.9; if (bg.wave >= 1) bg.wave = 0; }
   bgSize();
   gl.uniform2f(bg.loc.res, gl.drawingBufferWidth, gl.drawingBufferHeight);
   gl.uniform1f(bg.loc.t, now / 1000); gl.uniform1f(bg.loc.travel, bg.travel);
   gl.uniform1f(bg.loc.pulse, bg.pulse); gl.uniform1f(bg.loc.wave, bg.wave);
-  gl.uniform1f(bg.loc.team, bg.team); gl.uniform1f(bg.loc.mode, bg.mode);
+  gl.uniform1f(bg.loc.team, bg.team); gl.uniform1f(bg.loc.mode, bg.mode); gl.uniform1f(bg.loc.ceremony, bg.ceremony);
   gl.uniform3fv(bg.loc.cSig, col("signal")); gl.uniform3fv(bg.loc.cRed, col("red")); gl.uniform3fv(bg.loc.cBlue, col("blue"));
+  gl.uniform3fv(bg.loc.cGold, col("warn"));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
 function bgLoop() {
@@ -215,9 +229,12 @@ function burstAt(el, opts) {
 function mode(m) {
   const v = MODES[m] != null ? MODES[m] : 0;
   if (v === 2 && bg.mode !== 2) { bg.wave = 0.001; bg.pulse = 1; }
-  if (v === 4) bg.pulse = 1;
+  if (v === 4 && bg.mode !== 4) { bg.pulse = 1; bg.ceremonyStart = performance.now(); }
   bg.mode = v;
   if (reduced) bgDraw(performance.now());
+}
+function ceremony(kind) {
+  mode(kind === "loss" ? "loss" : kind === "match" ? "match" : "win");
 }
 function enable(b) {
   on = !!b;
@@ -236,7 +253,7 @@ function boot() {
   bgLoop();
 }
 window.FX = Object.freeze({
-  mode, burst, burstAt, enable,
+  mode, ceremony, burst, burstAt, enable,
   pulse: s => { bg.pulse = Math.max(bg.pulse, Number(s) || 0.6); },
   team: b => { bg.team = b ? 1 : 0; },
   setCb: b => { cb = !!b; },

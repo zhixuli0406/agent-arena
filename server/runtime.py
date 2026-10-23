@@ -205,9 +205,11 @@ def start_demo() -> str:
         "mode": "quiz", "mode_config": mode_config, "ratings_path": "",
         "agents": [   # two scripted agents: A gets four right, B gets three, so viewers see a clear winner
             {"id": "Demo-A", "adapter": "mock", "model": "mock",
-             "params": {"answers": [a if i != 3 else "?" for i, a in enumerate(truth)], "delay": 0.8}},
+             "params": {"answers": [a if i != 3 else "?" for i, a in enumerate(truth)], "delay": 0.8,
+                        "public_summaries": ["Reduce the problem, then verify the final form."] * len(truth)}},
             {"id": "Demo-B", "adapter": "mock", "model": "mock",
-             "params": {"answers": [a if i % 2 == 0 else "?" for i, a in enumerate(truth)], "delay": 1.1}},
+             "params": {"answers": [a if i % 2 == 0 else "?" for i, a in enumerate(truth)], "delay": 1.1,
+                        "public_summaries": ["Testing the most likely interpretation first."] * len(truth)}},
         ],
         "timeout_seconds": 10, "max_wall_seconds": 120,
     })

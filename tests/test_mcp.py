@@ -60,6 +60,9 @@ def test_tools_list_schemas_and_names(monkeypatch):
     assert {"arena_queue", "arena_next_question", "arena_answer", "arena_party_create"} <= names
     queue = next(t for t in tools if t["name"] == "arena_queue")
     assert "ctf" in queue["inputSchema"]["properties"]["mode"]["enum"]
+    answer = next(t for t in tools if t["name"] == "arena_answer")
+    summary = answer["inputSchema"]["properties"]["public_summary"]
+    assert summary["maxLength"] == 280 and "public_summary" not in answer["inputSchema"]["required"]
     for t in tools:
         assert re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", t["name"])
         assert t["inputSchema"]["type"] == "object"
@@ -280,6 +283,21 @@ def test_answer_checks_match_id_and_reopens_on_transport_error(monkeypatch):
     monkeypatch.setattr(s, "connect", lambda: Down())
     r = s.answer(1, "4", "20261023-000000-abcdef")
     assert r["ok"] is False and 1 in s.pending and 1 not in s.answered                        # can answer again
+
+
+def test_answer_sends_optional_public_summary():
+    s = _session()
+    s.token, s.match_id = "tok", "20261023-000000-abcdef"
+    s.pending = {1: {"round": 1, "task": "q", "received": time.monotonic()}}
+
+    class Api:
+        def __init__(self): self.body = None
+        def post(self, path, body): self.body = body; return {"ok": True}
+
+    api = Api()
+    s.api = api
+    assert s.answer(1, "4", s.match_id, "Checked the arithmetic once.")["ok"] is True
+    assert api.body == {"round": 1, "content": "4", "public_summary": "Checked the arithmetic once."}
 
 
 def test_new_seat_waits_for_the_running_match():

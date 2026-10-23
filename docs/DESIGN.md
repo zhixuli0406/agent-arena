@@ -102,7 +102,7 @@ To keep attribution clean, the scheduler tries to arrange "controlled" matches (
 
 ## Data flow and logging
 
-Each match writes one private `Transcript` (JSON Lines), one line per event (observation, action, settlement, circuit breaker, provision/teardown). The public spectator stream reads it, but CTF matches publish only an allowlisted projection: no observations, submitted flag text, request paths, target responses, or error text. The mode scores actions before the engine writes events. Failure events remain explicit in the transcript.
+Each match writes one private `Transcript` (JSON Lines), one line per event (observation, action, settlement, circuit breaker, provision/teardown). An agent may attach a short, deliberately public strategy summary to its action; the engine records it as a separate `commentary` event after secret-pattern redaction, so it is never confused with the scored answer or hidden model chain-of-thought. The public spectator stream reads the transcript, but CTF matches publish only an allowlisted projection: no observations, commentary, submitted flag text, request paths, target responses, or error text. The mode scores actions before the engine writes events. Failure events remain explicit in the transcript.
 
 ## Online lobby and player connections (public version)
 

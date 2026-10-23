@@ -26,6 +26,7 @@ def test_ctf_projection_is_fail_closed():
              "params": {"answers": [FLAG]}}]}},
         {"type": "observation", "round": 1, "agent": "alice", "data": {"task": FLAG}},
         {"type": "action", "round": 1, "agent": "alice", "data": {"content": "SUBMIT " + FLAG}},
+        {"type": "commentary", "round": 1, "agent": "alice", "data": {"text": "I found " + FLAG}},
         {"type": "request", "round": 1, "agent": "alice", "data": {
             "method": "GET", "path": "/?flag=" + FLAG, "status": 200, "resp": FLAG}},
         {"type": "invalid_action", "round": 1, "agent": "alice", "data": {"content": FLAG}},
@@ -39,9 +40,9 @@ def test_ctf_projection_is_fail_closed():
     projected = [public_ctf_event(json.dumps(event)) for event in events]
     output = "\n".join(value for value in projected if value)
     assert FLAG not in output
-    assert projected[1] is None and projected[4] is None and projected[6] is None and projected[9] is None
+    assert projected[1] is None and projected[3] is None and projected[5] is None and projected[7] is None and projected[10] is None
     assert json.loads(projected[2])["data"] == {}
-    assert json.loads(projected[3])["data"] == {"method": "GET", "status": 200}
+    assert json.loads(projected[4])["data"] == {"method": "GET", "status": 200}
     assert public_ctf_event("not json") is None
 
 
@@ -52,6 +53,7 @@ def test_ctf_spectator_endpoint_filters_transcript(tmp_path, monkeypatch):
         {"type": "match_start", "round": 0, "data": {"agents": [{"id": "alice", "system_prompt": FLAG}]}},
         {"type": "observation", "round": 1, "agent": "alice", "data": {"task": FLAG}},
         {"type": "action", "round": 1, "agent": "alice", "data": {"content": "SUBMIT " + FLAG}},
+        {"type": "commentary", "round": 1, "agent": "alice", "data": {"text": "Found " + FLAG}},
         {"type": "request", "round": 1, "agent": "alice", "data": {"resp": FLAG}},
         {"type": "result", "round": 1, "data": {"scores": {"alice": 1},
             "ranking": ["alice"], "status": "COMPLETE"}},

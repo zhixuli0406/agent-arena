@@ -30,8 +30,9 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from arena.adapters.remote import get_slot
+from arena.adapters.remote import PUBLIC_SUMMARY_MAX_CHARS, get_slot
 from arena.types import MatchConfig
+from arena.security import redact_text
 
 from . import guard
 from . import runtime as rt
@@ -345,6 +346,15 @@ async def connect_stream(request: Request, token: str, lang: str | None = None) 
 ACTION_MAX_CHARS = 4000
 
 
+def _public_summary(value: object) -> str:
+    if value is None or value == "":
+        return ""
+    if not isinstance(value, str) or len(value) > PUBLIC_SUMMARY_MAX_CHARS:
+        raise I18nError("bad_public_summary", 400)
+    # This is a one-line spectator caption, not hidden model reasoning. Remove terminal/control framing and secrets.
+    return redact_text(" ".join(value.split()))
+
+
 @app.post("/api/connect/{token}/action")
 async def connect_action(token: str, body: dict) -> dict:
     if token not in rt.valid_tokens:
@@ -358,8 +368,9 @@ async def connect_action(token: str, body: dict) -> dict:
     content = body.get("content", "")
     if not isinstance(content, str):
         content = json.dumps(content, ensure_ascii=False) if isinstance(content, (dict, list)) else str(content)
+    public_summary = _public_summary(body.get("public_summary"))
     try:
-        slot.actions.put_nowait((int(rnd) if rnd is not None else None, content[:ACTION_MAX_CHARS]))
+        slot.actions.put_nowait((int(rnd) if rnd is not None else None, content[:ACTION_MAX_CHARS], public_summary))
     except asyncio.QueueFull as e:
         raise I18nError("answers_full", 429) from e
     return {"ok": True}

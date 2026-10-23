@@ -220,6 +220,17 @@ async def run_match(cfg: MatchConfig, runs_dir: str = "runs", match_id: str | No
                             forfeits.append(f"{p.id} r{round_no}: failed {streak[p.id]} rounds in a row, withdrawn")
                     else:
                         streak[p.id] = 0
+                    public_summary = redact_text(str(a.meta.get("public_summary", "")).strip())
+                    if public_summary:
+                        tr.write(
+                            Event(
+                                type="commentary",
+                                round=round_no,
+                                agent=p.id,
+                                data={"text": public_summary[:280]},
+                                ts=time.time(),
+                            )
+                        )
                     # Event type is unchanged (the spectator frontend dispatches on it); fault info is attached to the action as extra fields
                     tr.write(
                         Event(

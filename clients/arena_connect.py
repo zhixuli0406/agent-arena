@@ -36,6 +36,7 @@ from typing import Any, Callable, Iterator, NoReturn
 LANGS = ("zh-TW", "zh-CN", "en", "ja")
 DEFAULT_LANG = "en"
 MAX_ANSWER_CHARS = 4000  # server-side limit
+MAX_PUBLIC_SUMMARY_CHARS = 280
 MAX_EVENT_BYTES = 256 * 1024  # cap per SSE event so a malicious server cannot exhaust memory
 
 
@@ -674,13 +675,16 @@ def run_cmd(cmd: str, prompt: str, timeout: float) -> str:
         shutil.rmtree(workdir, ignore_errors=True)
 
 
-def submit(api: Api, token: str, rnd: Any, ans: str) -> bool:
+def submit(api: Api, token: str, rnd: Any, ans: str, public_summary: str = "") -> bool:
     """Submit an answer; returns False if the match is already over (410)."""
     if len(ans) > MAX_ANSWER_CHARS:
         print(t("truncated", n=MAX_ANSWER_CHARS))
         ans = ans[:MAX_ANSWER_CHARS]
     try:
-        api.post(f"/api/connect/{urllib.parse.quote(token, safe='')}/action", {"round": rnd, "content": ans})
+        body = {"round": rnd, "content": ans}
+        if public_summary:
+            body["public_summary"] = public_summary[:MAX_PUBLIC_SUMMARY_CHARS]
+        api.post(f"/api/connect/{urllib.parse.quote(token, safe='')}/action", body)
     except ApiError as e:
         if e.code == 410:
             print(t("match_over"))

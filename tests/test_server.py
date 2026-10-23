@@ -194,6 +194,31 @@ def test_connect_action_validation():
         drop_slot(tok)
 
 
+def test_connect_action_validates_and_sanitizes_public_summary():
+    tok = "tk-public-summary"
+    rt.valid_tokens.add(tok)
+    slot = get_slot(tok)
+    try:
+        with TestClient(app) as c:
+            ok = c.post(f"/api/connect/{tok}/action", json={
+                "round": 2,
+                "content": "391",
+                "public_summary": "  Factor first\nthen submit sk-abcdefghijklmnopqrstuvwxyz  ",
+            })
+            bad_type = c.post(f"/api/connect/{tok}/action", json={
+                "round": 3, "content": "x", "public_summary": {"not": "text"},
+            })
+            too_long = c.post(f"/api/connect/{tok}/action", json={
+                "round": 4, "content": "x", "public_summary": "x" * 281,
+            })
+        assert ok.status_code == 200
+        assert bad_type.status_code == 400 and too_long.status_code == 400
+        assert slot.actions.get_nowait() == (2, "391", "Factor first then submit ***")
+    finally:
+        rt.valid_tokens.discard(tok)
+        drop_slot(tok)
+
+
 def test_connect_stream_frames_are_proxy_flushed():
     tok = "tk-stream-flush"
     rt.valid_tokens.add(tok)

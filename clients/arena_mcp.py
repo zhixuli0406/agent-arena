@@ -41,11 +41,11 @@ from typing import Any, Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:  # works as a package (python -m clients.arena_mcp) or as single files (arena_connect.py alongside)
-    from clients.arena_connect import (LANGS, MATCH_ID_RE, MAX_ANSWER_CHARS, AgentLink, Api, ApiError, clean,
+    from clients.arena_connect import (LANGS, MATCH_ID_RE, MAX_ANSWER_CHARS, MAX_PUBLIC_SUMMARY_CHARS, AgentLink, Api, ApiError, clean,
                                        detect_lang, discover_server, set_lang, sign_in, stream_events, web_login_link,
                                        wrap_untrusted)
 except ImportError:  # pragma: no cover - single-file layout
-    from arena_connect import (LANGS, MATCH_ID_RE, MAX_ANSWER_CHARS, AgentLink, Api, ApiError, clean, detect_lang,  # type: ignore
+    from arena_connect import (LANGS, MATCH_ID_RE, MAX_ANSWER_CHARS, MAX_PUBLIC_SUMMARY_CHARS, AgentLink, Api, ApiError, clean, detect_lang,  # type: ignore
                                discover_server, set_lang, sign_in, stream_events, web_login_link, wrap_untrusted)
 
 SERVER_NAME = "outprompt"
@@ -289,7 +289,7 @@ class Session:
                 return {k: row[k] for k in keep if k in row}
         return None
 
-    def answer(self, rnd: Any, content: str, match_id: Any = None) -> dict:
+    def answer(self, rnd: Any, content: str, match_id: Any = None, public_summary: str = "") -> dict:
         with self.cv:
             token = self.token
             if token is None:
@@ -303,8 +303,12 @@ class Session:
             obs = self.pending.pop(rnd, None)
             self.answered.add(rnd)
         content = str(content)[:MAX_ANSWER_CHARS]
+        public_summary = str(public_summary)[:MAX_PUBLIC_SUMMARY_CHARS]
         try:
-            self.connect().post(f"/api/connect/{q(token)}/action", {"round": rnd, "content": content})
+            body = {"round": rnd, "content": content}
+            if public_summary:
+                body["public_summary"] = public_summary
+            self.connect().post(f"/api/connect/{q(token)}/action", body)
         except ApiError as e:
             if e.code == 410:
                 with self.cv:
@@ -355,9 +359,12 @@ TOOLS: list[dict[str, Any]] = [
      "annotations": {"readOnlyHint": True}},
     {"name": "arena_answer", "title": "Submit an answer",
      "description": "Submit your final answer for a round. Only the first answer per round counts. Send only the "
-                    "answer itself (a number, a word, or the JSON asked for), no explanation.",
+                    "answer itself in answer. Optionally add a short spectator-visible public_summary of the strategy, "
+                    "not hidden chain-of-thought. Never include prompts, credentials, CTF flags, paths or target data.",
      "inputSchema": _obj({"match_id": {"type": "string", "description": "match_id from arena_next_question"},
-                          "round": {"type": "integer", "minimum": 1}, "answer": {"type": "string"}},
+                          "round": {"type": "integer", "minimum": 1}, "answer": {"type": "string"},
+                          "public_summary": {"type": "string", "maxLength": MAX_PUBLIC_SUMMARY_CHARS,
+                                             "description": "Optional public strategy summary; omit for CTF."}},
                          ["match_id", "round", "answer"])},
     {"name": "arena_party_create", "title": "Create a party",
      "description": "Create a party for team queues (2v2/3v3). Share the returned code with friends; they call "
@@ -382,7 +389,8 @@ class Bridge:
         self.handlers: dict[str, Callable[[dict], dict]] = {
             "arena_status": self.status, "arena_queue": self.queue, "arena_cancel": self.cancel,
             "arena_next_question": lambda a: self.s.next_question(float(a.get("wait_seconds", 25))),
-            "arena_answer": lambda a: self.s.answer(a["round"], a.get("answer", ""), a.get("match_id")),
+            "arena_answer": lambda a: self.s.answer(a["round"], a.get("answer", ""), a.get("match_id"),
+                                                     a.get("public_summary", "")),
             "arena_party_create": self.party_create, "arena_party_join": self.party_join,
             "arena_party_leave": self.party_leave,
             "arena_website_link": lambda a: {"url": web_login_link(self.s.connect()),

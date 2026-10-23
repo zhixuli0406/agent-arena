@@ -17,7 +17,7 @@ Read this document before working on the security arena (`ctf` mode). The rules 
 | Cloud Run egress | ⚠️ Not controlled | So `cloudrun` v0 only accepts self-hosted self (inert) targets; OSS targets wait for VPC egress control |
 | C1 no host-side agentic agents | ✅ Enforced | `ctf` setup checks `is_host_actor`; can be explicitly allowed with `allow_host_agentic` |
 | P1 public CTF closed configuration | ✅ Enforced | Public policy accepts only `builtin` + `arena-warmup`, first blood, 12 rounds, six target requests per agent, 120 seconds per action, 300 seconds total and no supplied flag or override |
-| CTF spectator flag secrecy | ✅ Enforced | The stream emits an allowlisted `ctf` projection; match status and lobby match lists withhold CTF failure text. The private transcript retains match evidence. |
+| CTF spectator flag secrecy | ✅ Enforced | The stream emits an allowlisted `ctf` projection and drops agent commentary; match status and lobby match lists withhold CTF failure text. The private transcript retains match evidence. |
 
 ## Threat model: who we defend against
 

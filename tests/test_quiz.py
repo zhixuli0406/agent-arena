@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from arena.engine import run_match
 from arena.modes.quiz import grade
 from arena.types import AgentSpec, MatchConfig
@@ -41,6 +43,21 @@ async def test_elo_winner_gains(tmp_path):
     assert report.elo_deltas["alpha"]["model"] > 0
     assert report.elo_deltas["alpha"]["prompt"] > 0
     assert report.elo_deltas["beta"]["model"] < 0
+
+
+async def test_agent_public_summary_is_a_separate_redacted_event(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.mode_config["questions"] = _QUESTIONS[:1]
+    cfg.agents[0].params["public_summaries"] = ["Compute directly with sk-abcdefghijklmnopqrstuvwxyz"]
+    report = await run_match(cfg, runs_dir=str(tmp_path / "runs"))
+    events = [json.loads(line) for line in open(report.transcript_path, encoding="utf-8")]
+    notes = [event for event in events if event["type"] == "commentary"]
+    assert notes == [{
+        "type": "commentary", "round": 1, "agent": "alpha",
+        "data": {"text": "Compute directly with ***"}, "ts": notes[0]["ts"],
+    }]
+    action = next(event for event in events if event["type"] == "action" and event["agent"] == "alpha")
+    assert "public_summary" not in action["data"]
 
 
 # --- grade regressions: false positives flagged in review must be blocked ---

@@ -80,7 +80,22 @@ function redraw() {
   }
   $("vsRedScore").textContent = fmtPts(red); $("vsBlueScore").textContent = fmtPts(blue);
 }
-function feed(html) { const d = node("div"); d.innerHTML = html; $("bFeed").prepend(d); }
+function feedNode(d) {
+  const host = $("bFeed"); host.prepend(d);
+  while (host.children.length > 80) host.lastElementChild.remove();
+}
+function feed(html) { const d = node("div"); d.innerHTML = html; feedNode(d); }
+function feedThought(ev) {
+  // public_summary arrives as plain text in a commentary event; never promote it to trusted HTML.
+  const publicSummary = String((ev.data || {}).text || "").trim().slice(0, 280);
+  if (!publicSummary) return;
+  const thought = node("article", "thought");
+  const head = node("div", "thought-head");
+  const agent = node("span", "thought-agent"); agent.textContent = String(ev.agent || "").slice(0, 80);
+  const label = node("span", "thought-label"); label.textContent = t("f_thought", { n: ev.round || "–" });
+  const summary = node("p", "thought-summary"); summary.textContent = publicSummary;
+  head.append(agent, label); thought.append(head, summary); feedNode(thought);
+}
 function setBadge(s) { const b = $("bStatus"); b.className = badgeClass(s); b.dataset.s = s; b.textContent = statusLabel(s); }
 function renderMeta() { if (bMatch) $("bMeta").textContent = bMode ? `${bMatch}・${modeName(bMode)}` : bMatch; }
 function onEvent(ev) {
@@ -93,6 +108,7 @@ function onEvent(ev) {
     });
     bMode = d.mode; renderMeta();
   } else if (ev.type === "teams") { bTeams = ev.data || null; renderWin(); renderResult(); }
+  else if (ev.type === "commentary") feedThought(ev);
   else if (ev.type === "action") { if (bMode !== "ctf") feed(th("f_act", { a: ev.agent })); }
   else if (ev.type === "request") {
     const d = ev.data || {}; feed(th("f_ctf_req", { a: ev.agent, m: d.method || "HTTP", s: d.status == null ? "?" : d.status }));
@@ -137,6 +153,33 @@ function finish(d) {
 }
 
 /* ---------- post-match screen ---------- */
+function winner() {
+  if (bTeams && Array.isArray(bTeams.team_ranking) && bTeams.team_ranking.length) {
+    const sc = bTeams.team_scores || {}, [a, b] = bTeams.team_ranking;
+    return b != null && Number(sc[a]) === Number(sc[b]) ? null : sideName(a);
+  }
+  const rank = bResult && Array.isArray(bResult.ranking) ? bResult.ranking : [];
+  if (!rank.length) return null;
+  const scores = bResult.scores || {}, top = Number(scores[rank[0]]);
+  return rank.length > 1 && Number(scores[rank[1]]) === top ? null : rank[0];
+}
+function renderPodium() {
+  const host = $("resPodium"); host.replaceChildren();
+  let ranking = [], scores = {}, members = null;
+  if (bTeams && Array.isArray(bTeams.team_ranking)) {
+    ranking = bTeams.team_ranking; scores = bTeams.team_scores || {}; members = bTeams.members || {};
+  } else if (bResult) { ranking = bResult.ranking || []; scores = bResult.scores || {}; }
+  ranking.slice(0, 4).forEach((id, i) => {
+    const li = node("li", i === 0 ? "first" : "");
+    const rank = node("span", "podium-rank", String(i + 1).padStart(2, "0"));
+    const who = node("span", "podium-name"); who.textContent = members ? sideName(id) : id;
+    if (members && Array.isArray(members[id])) {
+      const sub = node("small", "podium-members"); sub.textContent = members[id].join(" · "); who.appendChild(sub);
+    }
+    const score = node("span", "podium-score", fmtPts(Number(scores[id]) || 0));
+    li.append(rank, who, score); host.appendChild(li);
+  });
+}
 function outcome() {
   if (!bResult) return null;
   if (bTeams && mySide && Array.isArray(bTeams.team_ranking)) {
@@ -153,9 +196,13 @@ function outcome() {
 function renderResult() {
   if (!bResult) return;
   const box = $("result"), o = own ? outcome() : null;
-  box.className = "result" + (o ? " " + o : "");
+  const entering = box.classList.contains("hide");
+  box.className = "result " + (o || "spec");
   $("resKicker").textContent = !own ? t("res_k_spec") : t(S.seatRanked ? "res_k_ranked" : "res_k_unranked");
-  $("resTitle").textContent = t(o ? "res_" + o : "res_done");
+  const victor = winner();
+  $("resTitle").textContent = t(o ? "res_" + o : victor ? "res_victor" : "res_draw");
+  $("resChampion").textContent = victor || t("res_no_winner");
+  $("resMoment").textContent = victor ? t("res_moment", { w: victor }) : t("res_moment_draw");
   $("resSub").textContent = $("bWin").textContent;
   $("btnAgain").classList.toggle("hide", !own);
   const mine = own && myId && B[myId];
@@ -163,19 +210,16 @@ function renderResult() {
   if (own) {                                  // the question card has nothing left to do: give the board the room
     $("matchPanel").classList.add("hide"); document.querySelector(".match").classList.add("spectate");
   }
-  const wasHidden = box.classList.contains("hide");
-  box.classList.remove("hide");
-  if (wasHidden) window.scrollTo({ top: 0, behavior: "smooth" });
-  if (window.FX && o) {
-    window.FX.mode(o === "win" ? "win" : o === "loss" ? "loss" : "match");
-    if (o === "win" && !celebrated) {
-      celebrated = true;
-      setTimeout(() => {                       // after the scroll to the top, so the burst lands on the banner
-        const r = $("resTitle").getBoundingClientRect();
-        [0.15, 0.5, 0.85].forEach((f, i) => setTimeout(() => window.FX.burst(r.left + r.width * f, r.top + r.height / 2,
-          { color: i === 1 ? "warn" : "good", count: 90, speed: 640, size: 8 }), i * 160));
-      }, 450);
-    }
+  renderPodium();
+  if (entering) {
+    void box.offsetWidth;
+    box.classList.add("reveal");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else box.classList.add("revealed");
+  if (window.FX && !celebrated) {
+    celebrated = true;
+    const scene = o === "loss" ? "loss" : victor ? "win" : "match";
+    if (window.FX.ceremony) window.FX.ceremony(scene); else window.FX.mode(scene);
   }
 }
 function renderDelta(me) {

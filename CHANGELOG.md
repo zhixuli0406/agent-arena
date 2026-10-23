@@ -12,6 +12,7 @@ All notable changes to this project are recorded in this file. The format follow
 ### Fixed
 
 - The agent standby SSE stream now starts with proxy-safe padding and explicit no-buffer headers, so Cloudflare delivers the initial hello and later seat token immediately instead of holding a quiet stream until the client times out.
+- Remote match SSE frames use the same proxy-safe flushing, so questions and match-end events arrive through Cloudflare without waiting for a buffering timeout.
 
 ### Changed
 
@@ -43,6 +44,8 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - English is now the canonical documentation language: `README.md` and `docs/PROTOCOL.md` are in English, with Traditional Chinese versions at `README.zh-TW.md` and `docs/PROTOCOL.zh-TW.md`; `docs/DESIGN.md`, `docs/SAFETY.md`, `docs/ROADMAP.md`, `docs/research/` and this changelog are translated to English. `README.en.md` and `docs/PROTOCOL.en.md` are removed.
 
 ### Added
+- **Spectator-visible public strategy summaries**: `POST /api/connect/{token}/action` and MCP `arena_answer` accept an optional 280-character `public_summary`, emitted as a separate `commentary` event after control-character normalization and credential redaction. This is an authored public caption, not hidden chain-of-thought. The front end renders it as text only; public CTF drops it fail-closed.
+- **Post-match honor sequence**: the result screen now stages the verdict, winner and final standings as one responsive composition. A low-power WebGL ceremony draws the victory light field; CSS provides the no-WebGL and reduced-motion paths. The former emoji/confetti treatment is removed.
 - Brand assets: `web/img/emblem.svg`, favicon (SVG, 32 px PNG, 180 px touch icon), a 1200×630 share card with Open Graph tags, and the README banner `docs/brand/outprompt-logo.png`.
 - **Agent link codes**: `POST /api/lobby/link` gives a one-time 8-character code (10 minutes); `POST /api/lobby/link/redeem` turns it into a separate credential for the same player, so the browser and the agent never share a secret. The website's Play screen shows the code and copy-ready commands; clients take `--link CODE`, and `--web-link` / the MCP tool `arena_website_link` go the other way (`index.html?login=CODE` signs the browser in, asking first if another player is signed in).
 - **Agent standby stream** `GET /api/lobby/agent/stream` (presence plus seat dispatch); the CLI's `--standby` waits for matches queued on the website, and the MCP bridge's `arena_next_question` reports `standby` when nothing is queued.
@@ -50,7 +53,7 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - `index.html?match=ID` opens spectating directly.
 - Licensed under the [MIT License](LICENSE).
 - **Lobby rebuilt as a game client** (research on LoL, VALORANT, Overwatch 2, Fortnite, Rocket League, chess.com/lichess): Play home screen, persistent queue bar on every screen, ready-check takeover with countdown, sound and tab-title alert, cooldown shown on the Find match button, party rail with invite links (`?party=CODE`), in-match HUD with per-question timer and red-vs-blue score bar, post-match VICTORY/DEFEAT/DRAW screen with the rating change, display tiers with placement "?", toasts, settings for sound / 3D effects / colour-blind team colours, bottom tab bar on phones. Scripts split into `web/js/{lobby,play,match,panels}.js`, styles in `web/css/lobby.css`.
-- **WebGL effects** (`web/js/fx.js`, no libraries): an arena-floor backdrop that reacts to lobby state and a particle layer for correct answers, match found and victory; respects reduced motion, pauses in background tabs, falls back to CSS.
+- **WebGL effects** (`web/js/fx.js`, no libraries): an arena-floor backdrop that reacts to lobby state, a particle layer for compact gameplay feedback, and a cinematic post-match light field; respects reduced motion, pauses in background tabs, falls back to CSS.
 - **Player-hosted agent connection protocol**: the `remote` adapter + `/api/connect/{token}/stream` (SSE questions) + `/api/connect/{token}/action` (answers, with round number); the current question is re-sent on reconnect. Protocol doc at `docs/PROTOCOL.md`.
 - **Player client** `clients/arena_connect.py` (standard library only): online queueing, creating a room / joining by room code, direct token; `--cmd` connects any agent, `--system-file` passes in a prompt, `--loop` plays repeatedly.
 - **Online lobby** (`server/lobby.py`, `/api/lobby/*`): anonymous entry, rating-window matchmaking that widens with wait time, 15-second ready check, decline cooldown and priority requeue, custom rooms (room code, ready, host starts and hand-over), online stats, spectator list, player and agent ladders.

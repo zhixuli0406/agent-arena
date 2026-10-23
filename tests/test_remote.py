@@ -34,9 +34,10 @@ async def test_stale_action_from_other_round_is_discarded():
 async def test_unrounded_action_accepted():
     ad = RemoteAdapter(AgentSpec(id="p", adapter="remote", params={"token": "tk-any"}))
     slot = get_slot("tk-any")
-    await slot.actions.put((None, "391"))
+    await slot.actions.put((None, "391", "I reduced the multiplication before submitting."))
     act = await asyncio.wait_for(ad.act(Observation(round=3, task="17*23")), timeout=2)
     assert act.content == "391"
+    assert act.meta["public_summary"] == "I reduced the multiplication before submitting."
     drop_slot("tk-any")
 
 
