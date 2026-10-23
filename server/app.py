@@ -1,4 +1,4 @@
-"""Agent Arena match server (public edition).
+"""Outprompt match server (public edition).
 
   - Single entry point for player-brought agents: /api/connect/{token}/stream (SSE, receive questions), /api/connect/{token}/action (answer)
   - Online lobby: /api/lobby/* (queue and matchmaking, ready check, custom rooms, stats, spectate list, leaderboard)
@@ -162,7 +162,7 @@ class GuardMiddleware:
         return await self.app(scope, receive, send)
 
 
-app = FastAPI(title="Agent Arena", lifespan=lifespan)
+app = FastAPI(title="Outprompt", lifespan=lifespan)
 app.add_middleware(GuardMiddleware)
 if rt.ALLOW_HOST_ADAPTERS:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "[::1]"])

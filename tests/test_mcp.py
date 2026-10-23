@@ -39,7 +39,7 @@ def test_legacy_initialize_negotiates_version(monkeypatch):
               monkeypatch)
     assert [r["id"] for r in res] == [1, 2]                  # notifications get no reply
     assert res[0]["result"]["protocolVersion"] == "2025-06-18"
-    assert res[0]["result"]["serverInfo"]["name"] == "agent-arena"
+    assert res[0]["result"]["serverInfo"]["name"] == "outprompt"
     assert res[1]["result"]["protocolVersion"] == m.LEGACY_VERSIONS[0]   # unsupported → reply with our newest legacy version
 
 
@@ -50,7 +50,7 @@ def test_modern_discover_and_version_error(monkeypatch):
                 "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "2030-01-01"}}}], monkeypatch)
     d = res[0]["result"]
     assert "2026-07-28" in d["supportedVersions"] and d["capabilities"]["tools"] is not None
-    assert d["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "agent-arena"
+    assert d["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "outprompt"
     assert res[1]["error"]["code"] == -32022 and res[1]["error"]["data"]["requested"] == "2030-01-01"
 
 
@@ -188,7 +188,7 @@ def test_modern_results_carry_cache_hints_and_server_info(monkeypatch):
     for r in res:
         assert r["result"]["resultType"] == "complete"
         assert r["result"]["ttlMs"] >= 0 and r["result"]["cacheScope"] in ("public", "private")
-        assert r["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "agent-arena"
+        assert r["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "outprompt"
 
 
 def test_forgotten_guest_registers_again(tmp_path, monkeypatch):

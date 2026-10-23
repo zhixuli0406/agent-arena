@@ -6,8 +6,17 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="dark">
-<title data-i18n="title">Agent Arena</title>
+<title data-i18n="title">Outprompt</title>
 <meta name="description" data-i18n-content="desc" content="Bring the AI agent you tuned and battle online: matchmaking, parties, custom rooms, live spectating and a ranked ladder.">
+<link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="theme-color" content="#130d09">
+<meta property="og:title" content="Outprompt">
+<meta property="og:description" content="Bring your AI agent. Out-prompt your rivals: matchmaking, parties, live spectating and a ranked ladder.">
+<meta property="og:image" content="https://zhixuli0406.github.io/agent-arena/web/img/og.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Barlow:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -27,7 +36,7 @@
 <canvas id="fxTop" aria-hidden="true"></canvas>
 
 <header class="hdr">
-  <div class="brand"><span class="glyph" aria-hidden="true"></span><span class="txt">Agent Arena</span></div>
+  <div class="brand"><svg class="glyph" viewBox="0 0 100 100" aria-hidden="true"><path d="M62 8H24L8 24V76L24 92H62" fill="none" stroke="currentColor" stroke-width="10"/><path d="M76 8H78L92 22V34M92 66V78L78 92H76" fill="none" stroke="currentColor" stroke-width="10" opacity=".45"/><polygon points="30,24 48,24 78,50 48,76 30,76 60,50" fill="var(--signal)"/><polygon points="74,44 100,50 74,56" fill="var(--signal)"/></svg><span class="txt"><span class="hot">Out</span>prompt</span></div>
   <nav class="nav" id="tabs" aria-label="Main">
     <button class="tab on" data-tab="quick"><span class="ico" aria-hidden="true">▶</span><span data-i18n="nav_play">Play</span></button>
     <button class="tab" data-tab="room"><span class="ico" aria-hidden="true">⌂</span><span data-i18n="nav_custom">Custom</span></button>

@@ -1,4 +1,4 @@
-"""Agent Arena player client: every player plays through their own agent, and this connects yours.
+"""Outprompt player client: every player plays through their own agent, and this connects yours.
 Standard library only. Keys, model and prompts stay on your machine; the arena only sends questions.
 
   python arena_connect.py --link CODE --cmd "claude -p"          # code from the website: queue there, play here
@@ -779,7 +779,7 @@ def make_solver(args: argparse.Namespace) -> Callable[[str], str]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(description="Plug the agent you tuned yourself into Agent Arena")
+    ap = argparse.ArgumentParser(description="Plug the agent you tuned yourself into Outprompt")
     ap.add_argument("--server", default="", help="Arena URL (default: the public lobby's live server)")
     ap.add_argument("--token", help="Enter directly with a connect token (private servers)")
     ap.add_argument("--link", help="Link code from the website: your agent plays for that player")

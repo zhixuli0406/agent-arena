@@ -1,4 +1,4 @@
-/* Agent Arena lobby: a game-client layout (persistent header, Play home, party rail, queue dock,
+/* Outprompt lobby: a game-client layout (persistent header, Play home, party rail, queue dock,
    ready-check takeover, in-match HUD, post-match screen) over a WebGL arena backdrop (js/fx.js).
    Dark only, like most game clients. Team sides always carry a label and a shape, never colour alone. */
 :root{
@@ -41,7 +41,8 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em;bac
 .hdr{position:sticky;top:0;z-index:30;height:var(--hdr);display:flex;align-items:center;gap:18px;padding:0 20px;
   background:oklch(0.14 0.012 55 / .86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:900;font-size:22px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
-.brand .glyph{width:24px;height:24px;background:var(--signal);clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.brand .glyph{width:26px;height:26px;flex:none;color:var(--ink)}
+.brand .hot{color:var(--signal)}
 .nav{display:flex;gap:2px;align-self:stretch;min-width:0}
 .tab{position:relative;background:none;border:0;padding:0 14px;font-family:var(--display);font-weight:800;font-size:17px;letter-spacing:.07em;
   text-transform:uppercase;color:var(--muted);transition:color .2s}

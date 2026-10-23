@@ -1,1 +1,1 @@
-"""Agent Arena player clients."""
+"""Outprompt player clients."""

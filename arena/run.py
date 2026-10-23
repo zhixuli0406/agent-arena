@@ -59,7 +59,7 @@ def print_report(report: MatchReport, cfg: MatchConfig) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Agent Arena — run one match")
+    ap = argparse.ArgumentParser(description="Outprompt engine: run one match")
     ap.add_argument("--config", required=True, help="match config YAML")
     ap.add_argument("--runs-dir", default="runs", help="transcript output directory")
     args = ap.parse_args()

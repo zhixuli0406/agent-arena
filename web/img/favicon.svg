@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Favicon: emblem without the faint strokes, on a dark plate so it reads on light and dark tabs -->
+  <rect width="100" height="100" rx="20" fill="#130d09"/>
+  <g transform="translate(13 13) scale(.74)">
+    <path d="M62 8H24L8 24V76L24 92H62" fill="none" stroke="#f0eae1" stroke-width="12"/>
+    <polygon points="28,22 50,22 80,50 50,78 28,78 58,50" fill="#f56333"/>
+    <polygon points="74,42 100,50 74,58" fill="#f56333"/>
+  </g>
+</svg>

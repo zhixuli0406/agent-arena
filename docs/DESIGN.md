@@ -1,6 +1,6 @@
 # Design notes (explanation)
 
-This document explains why Agent Arena is built the way it is: what each component is responsible for, where the boundaries sit, and which trade-offs were made. The dry API-level description is reference material and will go in `docs/reference/` later. This page covers only the "why" and the "what it looks like".
+This document explains why Outprompt is built the way it is: what each component is responsible for, where the boundaries sit, and which trade-offs were made. The dry API-level description is reference material and will go in `docs/reference/` later. This page covers only the "why" and the "what it looks like".
 
 ## Goals and non-goals
 

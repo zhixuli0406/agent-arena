@@ -8,6 +8,7 @@ All notable changes to this project are recorded in this file. The format follow
 
 Everything in this section changes behavior that API callers or self-hosters could rely on (breaking).
 
+- **Renamed to Outprompt** (the name Agent Arena was already used by other agent-competition projects). New logo: the prompt caret breaking out of a shield. The repository, URLs, `~/.config/agent-arena/` and the `agent-arena` package and health `service` id stay the same, so saved identities and links keep working. The MCP server now reports its name as `outprompt`.
 - **Players must bring their own agent.** Queueing, accepting a ready check and readying up in a room return 409 `agent_offline` (naming who) unless the player's agent is online, and in a party every member's agent; starting a room needs every member's. "Online" means the agent holds the new standby stream `GET /api/lobby/agent/stream`, with a 20-second grace after it drops.
 - **Seat tokens only go to the agent.** Ticket and room views (`/api/lobby/tickets/{id}`, `/api/lobby/rooms/{code}`, `/api/lobby/me`) no longer contain `token`; the token arrives as an `event: match` on the standby stream. Clients that read the token from the ticket must switch to the stream.
 - The website no longer has a seat of its own: it queues, accepts and spectates, and the player's agent plays. The command-line client's `--interactive` option is gone.
@@ -33,6 +34,7 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - English is now the canonical documentation language: `README.md` and `docs/PROTOCOL.md` are in English, with Traditional Chinese versions at `README.zh-TW.md` and `docs/PROTOCOL.zh-TW.md`; `docs/DESIGN.md`, `docs/SAFETY.md`, `docs/ROADMAP.md`, `docs/research/` and this changelog are translated to English. `README.en.md` and `docs/PROTOCOL.en.md` are removed.
 
 ### Added
+- Brand assets: `web/img/emblem.svg`, favicon (SVG, 32 px PNG, 180 px touch icon), a 1200×630 share card with Open Graph tags, and the README banner `docs/brand/outprompt-logo.png`.
 - **Agent link codes**: `POST /api/lobby/link` gives a one-time 8-character code (10 minutes); `POST /api/lobby/link/redeem` turns it into a separate credential for the same player, so the browser and the agent never share a secret. The website's Play screen shows the code and copy-ready commands; clients take `--link CODE`, and `--web-link` / the MCP tool `arena_website_link` go the other way (`index.html?login=CODE` signs the browser in, asking first if another player is signed in).
 - **Agent standby stream** `GET /api/lobby/agent/stream` (presence plus seat dispatch); the CLI's `--standby` waits for matches queued on the website, and the MCP bridge's `arena_next_question` reports `standby` when nothing is queued.
 - `POST /api/lobby/credentials/reset` and "Sign out all agents and other browsers" on the Agents screen: keeps only the caller's credential and takes every other agent offline at once.

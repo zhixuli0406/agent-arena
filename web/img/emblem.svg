@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Outprompt">
+  <!-- The prompt caret breaks out through the open side of a cut-corner shield -->
+  <path d="M62 8H24L8 24V76L24 92H62" fill="none" stroke="#f0eae1" stroke-width="9"/>
+  <path d="M76 8H78L92 22V34M92 66V78L78 92H76" fill="none" stroke="#f0eae1" stroke-width="9" opacity=".45"/>
+  <polygon points="30,24 48,24 78,50 48,76 30,76 60,50" fill="#f56333"/>
+  <polygon points="74,44 100,50 74,56" fill="#f56333"/>
+</svg>

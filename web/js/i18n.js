@@ -1,4 +1,4 @@
-/* Agent Arena web i18n: zh-TW (source) / zh-CN / en / ja.
+/* Outprompt web i18n: zh-TW (source) / zh-CN / en / ja.
  * t(key, params)  -> plain text (use with textContent)
  * th(key, params) -> trusted template with HTML-escaped params (use with innerHTML)
  * Markup: data-i18n, data-i18n-html, data-i18n-placeholder, data-i18n-title, data-i18n-aria, meta[data-i18n-content]
@@ -7,7 +7,7 @@
 "use strict";
 const STR={
 "zh-TW":{
- title:"代理競技場",
+ title:"Outprompt",
  agent_on:"代理在線",
  agent_off:"代理離線",
  ag_h:"接上你的代理",
@@ -164,7 +164,7 @@ const STR={
  btn_start:"開始對局",
  btn_invite:"複製邀請",
  btn_leave:"離開房間",
- r_invite:"來 Agent Arena 跟我對戰！房碼 {c}　{u}",
+ r_invite:"來 Outprompt 跟我對戰！房碼 {c}　{u}",
  r_left:"已離開房間。",
  w_h:"觀戰",
  w_help:"點一場進去看即時戰況。",
@@ -229,7 +229,7 @@ const STR={
  w_demo_starting:"示範局建立中…",
 },
 "zh-CN":{
- title:"智能体竞技场",
+ title:"Outprompt",
  agent_on:"智能体在线",
  agent_off:"智能体离线",
  ag_h:"接入你的智能体",
@@ -386,7 +386,7 @@ const STR={
  btn_start:"开始对局",
  btn_invite:"复制邀请",
  btn_leave:"离开房间",
- r_invite:"来 Agent Arena 和我对战！房间码 {c}　{u}",
+ r_invite:"来 Outprompt 和我对战！房间码 {c}　{u}",
  r_left:"已离开房间。",
  w_h:"观战",
  w_help:"点一局进去看实时战况。",
@@ -451,7 +451,7 @@ const STR={
  w_demo_starting:"正在创建演示对局…",
 },
 "en":{
- title:"Agent Arena",
+ title:"Outprompt",
  agent_on:"Agent online",
  agent_off:"Agent offline",
  ag_h:"Connect your agent",
@@ -608,7 +608,7 @@ const STR={
  btn_start:"Start game",
  btn_invite:"Copy invite",
  btn_leave:"Leave room",
- r_invite:"Come battle me on Agent Arena! Room code {c}  {u}",
+ r_invite:"Come battle me on Outprompt! Room code {c}  {u}",
  r_left:"You left the room.",
  w_h:"Spectate",
  w_help:"Click a game to watch it live.",
@@ -673,7 +673,7 @@ const STR={
  w_demo_starting:"Starting the demo…",
 },
 "ja":{
- title:"エージェント・アリーナ",
+ title:"Outprompt",
  agent_on:"エージェント接続中",
  agent_off:"エージェント未接続",
  ag_h:"エージェントを接続",
@@ -830,7 +830,7 @@ const STR={
  btn_start:"対戦開始",
  btn_invite:"招待をコピー",
  btn_leave:"退出",
- r_invite:"Agent Arena で対戦しよう！ルームコード {c}　{u}",
+ r_invite:"Outprompt で対戦しよう！ルームコード {c}　{u}",
  r_left:"ルームを退出しました。",
  w_h:"観戦",
  w_help:"対戦を選ぶとライブで観戦できます。",
