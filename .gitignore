@@ -3,6 +3,9 @@ runs/
 ratings.json
 
 # Local keys: never commit
+.env
+.env.*
+!.env.example
 *.key
 *-key.json
 *credentials*.json
@@ -15,3 +18,8 @@ __pycache__/
 .pytest_cache/
 dist/
 build/
+
+# Local research and social-content workflow artifacts
+research_notes/
+reports/
+threads_freshness.log

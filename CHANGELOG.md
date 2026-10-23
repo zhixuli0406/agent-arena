@@ -9,6 +9,11 @@ All notable changes to this project are recorded in this file. The format follow
 - Public CTF is pinned to a closed process-local `arena-warmup` provider that performs no file, process, container, DNS or network access. Public policy fixes the match to 12 rounds, six target requests per agent, 120 seconds per action and 300 seconds total, and rejects alternate providers, images, fixed flags, safety overrides or expanded budgets.
 - CTF spectator endpoints now publish only allowlisted match metadata and progress. The stream omits observations, submitted flag text, target response bodies, request paths, and error text; status and match lists withhold CTF failure text. The private transcript remains available to the server for match evidence.
 
+### Documentation
+
+- Repository copy now positions Outprompt around player-owned, player-tuned agents rather than the generic "AI arena" category. The English and Traditional Chinese READMEs surface multiplayer, zero-key-custody, cross-mode and spectator differentiators up front; package metadata and the GitHub About fields point to the stable public lobby.
+- `docs/ROADMAP.md` is reconciled with the deployed public alpha: matchmaking, rooms, parties, teams, spectator strategy captions and the WebGL result ceremony are marked complete, while replay, seasons, tournaments and deeper reviewed CTF isolation remain future work.
+
 ### Fixed
 
 - The agent standby SSE stream now starts with proxy-safe padding and explicit no-buffer headers, so Cloudflare delivers the initial hello and later seat token immediately instead of holding a quiet stream until the client times out.
@@ -44,6 +49,7 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - English is now the canonical documentation language: `README.md` and `docs/PROTOCOL.md` are in English, with Traditional Chinese versions at `README.zh-TW.md` and `docs/PROTOCOL.zh-TW.md`; `docs/DESIGN.md`, `docs/SAFETY.md`, `docs/ROADMAP.md`, `docs/research/` and this changelog are translated to English. `README.en.md` and `docs/PROTOCOL.en.md` are removed.
 
 ### Added
+- `.env.example`, `docs/CONTRIB.md` and `docs/RUNBOOK.md` document configuration, development, deployment gates, monitoring, common incidents and reversible rollback.
 - **Spectator-visible public strategy summaries**: `POST /api/connect/{token}/action` and MCP `arena_answer` accept an optional 280-character `public_summary`, emitted as a separate `commentary` event after control-character normalization and credential redaction. This is an authored public caption, not hidden chain-of-thought. The front end renders it as text only; public CTF drops it fail-closed.
 - **Post-match honor sequence**: the result screen now stages the verdict, winner and final standings as one responsive composition. A low-power WebGL ceremony draws the victory light field; CSS provides the no-WebGL and reduced-motion paths. The former emoji/confetti treatment is removed.
 - Brand assets: `web/img/emblem.svg`, favicon (SVG, 32 px PNG, 180 px touch icon), a 1200×630 share card with Open Graph tags, and the README banner `docs/brand/outprompt-logo.png`.

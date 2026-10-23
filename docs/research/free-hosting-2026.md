@@ -1,4 +1,6 @@
-# Truly free hosting options (2026-10-22)
+# Truly free hosting decision record (2026-10-22, adopted 2026-10-23)
+
+> **Current status:** Outprompt now uses a stable GitHub Pages lobby plus a long-running GitHub Actions job and rotating Cloudflare Quick Tunnel. The workflow verifies an isolated unprivileged server account, publishes the current URL through `server.json`, and restores sanitized state from the `data` branch. Render is no longer a pending launch decision. See [the operations runbook](../RUNBOOK.md) for the deployed architecture.
 
 > The user asked for free hosting that is "truly, completely free (no credit card, never billed)".
 > This document was checked and written by the main thread after the planned deep-research subagent was cut off by the session usage limit (429, resets at 12am Taipei time).
@@ -29,18 +31,16 @@ That way "free automatic server hosting" works without running into ToS or safet
 | **Koyeb** | ⚠️ may need a card / defaults to paid | ✅ | ✅ | 1 service, scale-to-zero | koyeb.com/pricing (conflicting) |
 | **Cloud Run** | ❌ needs a card | ✅ | ✅ | No charge within the free tier, but **not completely free** | (this project already has a cloudrun provider; listed as an option) |
 
-## Recommendation (waiting for your decision)
+## Original recommendation and adopted result
 
-- **Option verified with zero credentials (implemented and tested): Cloudflare quick tunnel**. `infra/serve-free.sh` puts the match server online directly, with no account, no credit card and no setup. Tested: the public `*.trycloudflare.com` URL is reachable and serves the API and the pixel game. It suits temporary public hosting that starts with a match and is torn down after it. Limit: the URL is random each time and not persistent.
-- **Main choice for persistence: Render free web service** (no card, confirmed firsthand; supports Docker; has an API; 750hr/month; automatic provisioning needs your free account's API key). Fallback: Back4App.
+- **Adopted:** Cloudflare Quick Tunnel hosts the harmless match API. GitHub Actions keeps it running and commits the rotating URL to `server.json`; the stable Pages lobby follows that pointer. `infra/serve-free.sh` remains the one-command temporary option.
+- **Not adopted:** Render and Back4App are no longer required for the public alpha. They remain alternatives if the runner-based service stops meeting capacity or availability needs.
 - **CTF targets: keep them on local Docker** (completely free and isolated); cloud targets are deferred.
-- Sleep and cold starts are acceptable for "start only when a match begins". To keep it always on, an external ping can keep it awake (watch out for ToS rules on keep-alives).
 
-## To do (after the limit resets)
-- Read Render's API / render.yaml free tier provisioning details firsthand, and confirm that the API can create/destroy automatically.
+## Further work, not a launch blocker
+
 - Read each platform's ToS firsthand for clauses on "vulnerable applications / security testing" (this decides whether cloud targets are possible at all).
-- Confirm firsthand, on the official page or forum, whether HF Docker Spaces are still free and whether Koyeb now needs a card.
-- Once chosen, implement the matching provider (needs your API key / account for that platform, a gate similar to the Grok key).
+- Re-evaluate persistent hosts only if the current GitHub Actions and tunnel model no longer meets availability or capacity needs.
 
 ## Sources
 - Render pricing: https://render.com/pricing
