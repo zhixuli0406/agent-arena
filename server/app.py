@@ -56,7 +56,7 @@ logging.getLogger("uvicorn.access").addFilter(_RedactTokenPath())
 
 ADMIN_TOKEN = os.environ.get("ARENA_ADMIN_TOKEN", "")
 DEFAULT_CORS = (
-    r"^https://(zhixuli0406\.github\.io|([a-z0-9-]+\.)*claude\.ai|([a-z0-9-]+\.)*claudeusercontent\.com)$"
+    r"^https://(zhixuli0406\.github\.io|([a-z0-9-]+\.)*claude\.ai)$"
     r"|^http://(localhost|127\.0\.0\.1)(:\d+)?$"
 )
 LOCAL_CORS = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"

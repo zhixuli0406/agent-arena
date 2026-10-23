@@ -120,6 +120,14 @@ def start_match(cfg: MatchConfig, on_done: Callable[[MatchReport], None] | None 
     return match_id
 
 
+def live_match_of(player_id: str) -> str | None:
+    """The lobby match this player is seated in right now, if any."""
+    for mid, m in matches.items():
+        if player_id in m.get("pids", ()) and not m["task"].done():
+            return mid
+    return None
+
+
 def _cleanup(tokens: list[str]) -> None:
     for tok in tokens:
         drop_slot(tok)
@@ -253,7 +261,7 @@ def _lobby_start(mode: str, players: list[Player], ranked: bool = True,
         for aid, pid in agent_to_player.items():
             lobby.apply_rating(pid, rep.elo_deltas.get(aid, {}).get("prompt", 0.0))
 
-    mid = start_match(cfg, on_done=_ladder, meta={"source": "lobby", "ranked": ranked})
+    mid = start_match(cfg, on_done=_ladder, meta={"source": "lobby", "ranked": ranked, "pids": [p.id for p in players]})
     for p in players:                         # the seat token goes to the player's agent, never to the lobby page
         hub.assign(p.id, {"match_id": mid, "token": tokens[p.id], "mode": mode, "ranked": ranked,
                              "side": (teams or {}).get(p.id)})

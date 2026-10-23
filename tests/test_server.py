@@ -363,3 +363,12 @@ def test_errors_default_to_english_without_accept_language():
         assert r.json()["detail"].isascii()
         r = c.get("/api/lobby/me", headers={"Accept-Language": "ja"})
         assert not r.json()["detail"].isascii()
+
+
+def test_user_content_origins_are_not_allowed():
+    # Anyone can publish a page on claudeusercontent.com; it must not pass the cross-site guard
+    import re
+    from server import app as app_mod
+    rx = re.compile(app_mod.DEFAULT_CORS)
+    assert not rx.match("https://abc.claudeusercontent.com")
+    assert rx.match("https://zhixuli0406.github.io")

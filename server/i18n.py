@@ -10,6 +10,8 @@ MESSAGES: dict[str, dict[str, str]] = {
                    "en": "The lobby is full. Please try again later.", "ja": "ロビーが満員です。しばらくしてからお試しください。"},
     "auth_failed": {"zh-TW": "玩家驗證失敗，請重新進入大廳", "zh-CN": "玩家验证失败，请重新进入大厅",
                     "en": "Player authentication failed. Please enter the lobby again.", "ja": "プレイヤー認証に失敗しました。ロビーに入り直してください。"},
+    "in_match": {"zh-TW": "{names} 還在比賽中，打完這場再排", "zh-CN": "{names} 还在比赛中，打完这场再排",
+                 "en": "{names} is still in a match. Finish it first.", "ja": "{names} はまだ対戦中です。終わってからにしてください。"},
     "player_unknown": {"zh-TW": "伺服器已不認得這位玩家（沒打過對局的訪客會被清掉），請重新進入大廳",
                        "zh-CN": "服务器已不认识这位玩家（没打过对局的访客会被清理），请重新进入大厅",
                        "en": "The server no longer knows this player (guests who never played are cleared). Please enter the lobby again.",

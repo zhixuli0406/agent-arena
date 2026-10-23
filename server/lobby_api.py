@@ -34,7 +34,12 @@ def _no_token(view: dict) -> dict:
 
 
 def _require_agents(player_ids: list[str]) -> None:
-    """Players must bring their own agent: every seat being filled needs that player's agent online."""
+    """Players must bring their own agent: every seat being filled needs that player's agent online,
+    and nobody can be pulled into a new match while still seated in a running one (their agent would
+    drop the live match, forfeiting every question left)."""
+    busy = [rt.lobby.players[pid].name for pid in player_ids if pid in rt.lobby.players and rt.live_match_of(pid)]
+    if busy:
+        raise I18nError("in_match", 409, names="、".join(busy))
     off = [rt.lobby.players[pid].name for pid in player_ids if pid in rt.lobby.players and not rt.hub.online(pid)]
     if off:
         raise I18nError("agent_offline", 409, names="、".join(off))

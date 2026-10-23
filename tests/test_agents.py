@@ -185,3 +185,21 @@ def test_sign_out_takes_other_agents_offline_without_grace():
     hub2.connect("q", "a")
     hub2.sign_out("q", keep="other")
     assert not hub2.online("q")
+
+
+def test_no_new_match_while_seated_in_a_running_one(monkeypatch):
+    with TestClient(app) as c:
+        a = reg(c, "Busy")
+        rt.hub.connect(a["player"]["id"])
+        monkeypatch.setattr(rt, "live_match_of", lambda pid: "20261023-000000-abcdef" if pid == a["player"]["id"] else None)
+        r = c.post("/api/lobby/queue", json={"mode": "quiz"}, headers={**hdr(a), "Accept-Language": "en"})
+        assert r.status_code == 409 and r.json()["code"] == "in_match" and "Busy" in r.json()["detail"]
+
+
+def test_live_match_of_tracks_running_lobby_matches(monkeypatch):
+    class T:
+        def __init__(self, done): self._d = done
+        def done(self): return self._d
+    monkeypatch.setattr(rt, "matches", {"m-run": {"task": T(False), "pids": ["p1"]},
+                                        "m-old": {"task": T(True), "pids": ["p2"]}})
+    assert rt.live_match_of("p1") == "m-run" and rt.live_match_of("p2") is None and rt.live_match_of("p3") is None
