@@ -16,7 +16,7 @@ function serverArgs() {
 }
 function commands() {
   // link.code was checked against [A-Z0-9] in getCode(), so it is safe unquoted in a shell command
-  const who = link ? ["--link", link.code] : ["--name", sq(t("cmd_name")), "--agent", sq(t("cmd_agent"))];
+  const who = ["--link", link.code];
   const lang = ["--lang", window.I18N.lang()];
   const install = ['python3 -m venv "$HOME/.local/share/outprompt"',
     BIN + 'python" -m pip install --upgrade ' + sq(PACKAGE)].join(" && ");
@@ -77,6 +77,15 @@ function renderInto(box, big) {
   head.append(node("span", "dot" + (on ? " on" : " off")), node("div", "h2", t(on ? "ag_on_h" : big ? "ag_off_h" : "ag_h")));   // the Agents tab already has the "Connect" title
   box.append(head, node("p", "note", t(on ? "ag_on_note" : signedIn ? "ag_need" : "ag_first")));
   if (on && !big) return;                                    // linked: the Play screen only needs the green light
+  if (!signedIn) {
+    const b = node("button", "btn", t("ag_enter_first")); b.type = "button";
+    b.addEventListener("click", () => {
+      const input = $("inName");
+      input.scrollIntoView({ behavior: "smooth", block: "center" }); input.focus();
+    });
+    box.appendChild(b);
+    return;                                                   // the website-first path prevents a second player identity
+  }
   if (signedIn) {
     const row = node("div", "row codebox");
     if (link) {
@@ -89,7 +98,7 @@ function renderInto(box, big) {
     }
     box.appendChild(row);
   }
-  if (signedIn && !link) return;                             // commands only make sense with a code (or for agent-first)
+  if (!link) return;                                         // commands only make sense with this browser's link code
   const c = commands(), ol = node("ol", "steps");
   ol.append(step("ag_install", false, c.install), choices(c), step("ag_verify", false));
   box.appendChild(ol);

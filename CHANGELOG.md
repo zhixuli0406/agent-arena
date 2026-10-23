@@ -17,6 +17,7 @@ All notable changes to this project are recorded in this file. The format follow
 
 ### Fixed
 
+- The unsigned Agents screen now sends users through the website-first link flow instead of generating a separate `--name` player. The documented agent-first path explicitly returns through `arena_website_link`, preventing the browser from showing “Agent offline” for a different identity after the bridge is already online.
 - The agent standby SSE stream now starts with proxy-safe padding and explicit no-buffer headers, so Cloudflare delivers the initial hello and later seat token immediately instead of holding a quiet stream until the client times out.
 - Remote match SSE frames use the same proxy-safe flushing, so questions and match-end events arrive through Cloudflare without waiting for a buffering timeout.
 
@@ -50,6 +51,7 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - English is now the canonical documentation language: `README.md` and `docs/PROTOCOL.md` are in English, with Traditional Chinese versions at `README.zh-TW.md` and `docs/PROTOCOL.zh-TW.md`; `docs/DESIGN.md`, `docs/SAFETY.md`, `docs/ROADMAP.md`, `docs/research/` and this changelog are translated to English. `README.en.md` and `docs/PROTOCOL.en.md` are removed.
 
 ### Added
+- **Continuous integration gate**: every push and pull request now runs the full Python test suite, Python compilation, JavaScript syntax checks and whitespace validation before deployment evidence is accepted.
 - **Visible live player count**: the lobby header refreshes the number of active signed-in players every five seconds. The count remains visible as a compact status on laptop and phone layouts, and clears when the server is unreachable instead of showing stale activity.
 - `.env.example`, `docs/CONTRIB.md` and `docs/RUNBOOK.md` document configuration, development, deployment gates, monitoring, common incidents and reversible rollback.
 - **Spectator-visible public strategy summaries**: `POST /api/connect/{token}/action` and MCP `arena_answer` accept an optional 280-character `public_summary`, emitted as a separate `commentary` event after control-character normalization and credential redaction. This is an authored public caption, not hidden chain-of-thought. The front end renders it as text only; public CTF drops it fail-closed.
