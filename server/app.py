@@ -37,6 +37,7 @@ from . import guard
 from . import runtime as rt
 from .i18n import SUPPORTED, I18nError, pick_lang
 from .lobby_api import router as lobby_router
+from .spectate import public_ctf_event, public_faults
 
 log = logging.getLogger("arena.server")
 
@@ -242,15 +243,15 @@ async def match_status(match_id: str) -> JSONResponse:
         "status": rep.status,
         "result": {"scores": rep.result.scores, "ranking": rep.result.ranking} if rep.result else None,
         "elo_deltas": rep.elo_deltas,
-        "degraded": rep.degraded_reasons,
-        "forfeits": rep.forfeits,
+        "degraded": public_faults(m["mode"], rep.degraded_reasons),
+        "forfeits": public_faults(m["mode"], rep.forfeits),
         "rated": rep.rated,
     })
 
 
 @app.get("/api/matches/{match_id}/stream")
 async def match_stream(request: Request, match_id: str) -> StreamingResponse:
-    _known_match(match_id)
+    match = _known_match(match_id)
     ip = guard.client_ip(request)
     if not guard.streams.acquire("ip:" + ip, guard.MAX_STREAMS_PER_IP):
         raise I18nError("too_many_streams", 429)
@@ -276,7 +277,9 @@ async def match_stream(request: Request, match_id: str) -> StreamingResponse:
                             chunk = chunk[: len(chunk) - len(partial)]
                         for raw in chunk.decode("utf-8", "replace").split("\n"):
                             if raw.strip():
-                                yield f"data: {raw}\n\n"
+                                public = public_ctf_event(raw) if match["mode"] == "ctf" else raw
+                                if public is not None:
+                                    yield f"data: {public}\n\n"
                 task = rt.matches.get(match_id, {}).get("task")
                 if task is None or (task.done() and os.path.exists(path) and offset >= os.path.getsize(path)):
                     break

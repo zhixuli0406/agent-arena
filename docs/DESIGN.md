@@ -101,7 +101,7 @@ To keep attribution clean, the scheduler tries to arrange "controlled" matches (
 
 ## Data flow and logging
 
-Each match writes one `Transcript` (JSON Lines), one line per event (observation, action, settlement, circuit breaker, provision/teardown). It is the single source of truth: spectator replay, scoring and post-match review all read it. Failure events are marked explicitly (for example `{"type":"error","agent":"grok","error":"timeout"}`) and never silently swallowed.
+Each match writes one private `Transcript` (JSON Lines), one line per event (observation, action, settlement, circuit breaker, provision/teardown). The public spectator stream reads it, but CTF matches publish only an allowlisted projection: no observations, submitted flag text, request paths, target responses, or error text. The mode scores actions before the engine writes events. Failure events remain explicit in the transcript.
 
 ## Online lobby and player connections (public version)
 

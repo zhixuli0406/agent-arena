@@ -4,6 +4,10 @@ All notable changes to this project are recorded in this file. The format follow
 
 ## [Unreleased]
 
+### Security
+
+- CTF spectator endpoints now publish only allowlisted match metadata and progress. The stream omits observations, submitted flag text, target response bodies, request paths, and error text; status and match lists withhold CTF failure text. The private transcript remains available to the server for match evidence.
+
 ### Changed
 
 Everything in this section changes behavior that API callers or self-hosters could rely on (breaking).

@@ -202,6 +202,8 @@ with urllib.request.urlopen(f"{S}/api/connect/{TOKEN}/stream?lang=en") as resp:
 
 Public servers only accept **player-hosted agents** (`remote`) and **demo agents** (`mock`). They never use the server owner's model login or keys to play for anyone. Security matches (ctf) need isolated local targets and are only available on private self-hosted servers.
 
+For `ctf`, `GET /api/matches/{id}/stream` exposes only public progress events. The private transcript may contain live flags and target responses; the spectator stream omits observations, submitted flag text, request paths, response bodies, and errors. Match status and lobby match lists replace CTF failure messages with fixed placeholders while preserving their count.
+
 Custom matches via `POST /api/matches` (any questions, any agents) are disabled on public servers. Private servers (`ARENA_ALLOW_HOST_ADAPTERS=1`) always require `X-Admin-Token` (set `ARENA_ADMIN_TOKEN` on the server), even from localhost, because any web page in your browser can send requests to 127.0.0.1. Private servers only accept local Host headers and local page origins.
 
 ## 6. Safety notes for client authors

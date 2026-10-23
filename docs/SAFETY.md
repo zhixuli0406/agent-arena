@@ -16,6 +16,7 @@ Read this document before working on the security arena (`ctf` mode). The rules 
 | G6 permission boundary | ✅ Enforced | `cloudrun` raises PermissionError on IAM_PERMISSION_DENIED, stops and reports |
 | Cloud Run egress | ⚠️ Not controlled | So `cloudrun` v0 only accepts self-hosted self (inert) targets; OSS targets wait for VPC egress control |
 | C1 no host-side agentic agents | ✅ Enforced | `ctf` setup checks `is_host_actor`; can be explicitly allowed with `allow_host_agentic` |
+| CTF spectator flag secrecy | ✅ Enforced locally | The stream emits an allowlisted `ctf` projection; match status and lobby match lists withhold CTF failure text. The private transcript retains match evidence. This does not enable CTF on the public server. |
 
 ## Threat model: who we defend against
 
@@ -23,6 +24,7 @@ Read this document before working on the security arena (`ctf` mode). The rules 
 2. **Accidental harm**: a misconfiguration exposes a target to the public internet, or a flag/question contains real credentials.
 3. **Runaway**: looping attacks exhaust quotas, or resources are never torn down and keep billing.
 4. **Prompt injection**: instructions embedded in target responses or question content get executed as commands to the agent or the engine.
+5. **Flag leakage**: another player or spectator reads a live flag from the public match stream before submitting their own answer.
 
 ## Hard gates (enforced in code, no bypass)
 

@@ -202,6 +202,8 @@ with urllib.request.urlopen(f"{S}/api/connect/{TOKEN}/stream") as resp:
 
 公開伺服器只接受**玩家自帶代理**（`remote`）與**示範代理**（`mock`）出賽，不會用伺服器擁有者的模型登入或金鑰替任何人出賽。資安攻防（ctf）需要本機隔離靶機，只在自架的私人伺服器上開放。
 
+`ctf` 的 `GET /api/matches/{id}/stream` 只提供公開進度事件。私人逐字紀錄可能含有仍有效的旗標與靶機回應；觀戰串流會略去觀測內容、提交的旗標、請求路徑、回應本文及錯誤訊息。比賽狀態和大廳對局列表會把 CTF 失敗訊息改為固定佔位文字，保留事件數量。
+
 自訂開局 `POST /api/matches`（任意題目與代理組合）在公開伺服器關閉；私人伺服器（`ARENA_ALLOW_HOST_ADAPTERS=1`）也一律要帶 `X-Admin-Token`（伺服器端設 `ARENA_ADMIN_TOKEN`），從本機連線也一樣，因為瀏覽器裡任何網頁都能對 127.0.0.1 發請求。私人伺服器的 Host 只認本機、CORS 只放本機頁面。
 
 ## 6. 安全須知（寫客戶端的人請讀）

@@ -26,6 +26,7 @@ from .agents import AgentHub
 from .i18n import I18nError
 from .lobby import Lobby, Player
 from .question_bank import pick
+from .spectate import public_faults
 
 log = logging.getLogger("arena.server")
 
@@ -177,7 +178,7 @@ def match_summary(match_id: str) -> dict[str, Any]:
                 out["team_scores"] = rep.result.details["team_scores"]
                 out["teams"] = rep.result.details["teams"]
         out["rated"] = rep.rated
-        out["forfeits"] = rep.forfeits
+        out["forfeits"] = public_faults(m["mode"], rep.forfeits)
     return out
 
 
