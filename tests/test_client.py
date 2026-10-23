@@ -185,3 +185,21 @@ def test_api_backs_off_and_retries_on_429(monkeypatch):
         raise AssertionError("expected ApiError")
     except ac.ApiError as e:
         assert e.code == 429 and sleeps == [ac.MAX_RETRY_WAIT]   # long Retry-After is capped
+
+
+def test_used_link_code_falls_back_to_saved_identity(tmp_path, monkeypatch):
+    # MCP client configs re-send the same --link on every restart; after the first use it must not break sign-in
+    monkeypatch.setattr(ac, "IDENTITY_PATH", tmp_path / "id.json")
+    ac.save_identity("http://x", "p_saved", "s")
+    calls = []
+
+    class FakeApi(ac.Api):
+        def call(self, method, path, body=None, timeout=30):
+            calls.append(path)
+            if path == "/api/lobby/link/redeem":
+                raise ac.ApiError(404, "used")
+            return {"player": {"id": self.pid, "name": "Saved", "rating": 1500}}
+
+    api = FakeApi("http://x")
+    me = ac.sign_in(api, None, "", "OLDCODE1", quiet=True)
+    assert api.pid == "p_saved" and me["name"] == "Saved" and calls == ["/api/lobby/link/redeem", "/api/lobby/me"]
