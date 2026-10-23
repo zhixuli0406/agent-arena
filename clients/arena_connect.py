@@ -72,7 +72,7 @@ def t(key: str, **params: Any) -> str:
     table = MESSAGES.get(_lang, MESSAGES[DEFAULT_LANG])
     text = table.get(key) or MESSAGES[DEFAULT_LANG][key]
     # Params mostly come from server responses: strip control chars so ESC/OSC sequences never reach the terminal
-    return text.format(**{k: clean(v) for k, v in params.items()}) if params else text
+    return text.format(**{k: clean_line(v) for k, v in params.items()}) if params else text
 
 
 def normalize_lang(tag: str | None) -> str | None:
@@ -138,6 +138,27 @@ def positive_float(value: str) -> float:
 
 
 # ---------------- HTTP ----------------
+MAX_JSON_BYTES = 1024 * 1024     # the lobby API never sends more; a bigger body is a hostile server
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """The arena API never redirects. Following one would re-send X-Player-* headers to wherever the
+    server points (another host, a LAN address, plain http)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        raise urllib.error.HTTPError(req.full_url, code, "redirect refused", headers, fp)
+
+
+_opener = urllib.request.build_opener(_NoRedirect)
+
+
+def _read_json(fp: Any) -> Any:
+    raw = fp.read(MAX_JSON_BYTES + 1) or b"{}"
+    if len(raw) > MAX_JSON_BYTES:
+        raise ValueError("response too large")
+    return json.loads(raw)
+
+
 RATE_LIMIT_RETRIES = 4
 MAX_RETRY_WAIT = 20.0
 
@@ -174,13 +195,16 @@ class Api:
         for attempt in range(RATE_LIMIT_RETRIES + 1):
             req = urllib.request.Request(self.base + path, data=data, headers=headers, method=method)
             try:
-                with urllib.request.urlopen(req, timeout=timeout) as r:
-                    return json.loads(r.read() or b"{}")
+                with _opener.open(req, timeout=timeout) as r:
+                    data = _read_json(r)
+                    if not isinstance(data, dict):
+                        raise ValueError("unexpected response")
+                    return data
             except urllib.error.HTTPError as e:
                 key = ""
                 try:
-                    body_json = json.loads(e.read())
-                    detail, key = body_json.get("detail", str(e)), str(body_json.get("code", ""))
+                    body_json = _read_json(e)
+                    detail, key = str(body_json.get("detail", str(e))), str(body_json.get("code", ""))
                 except Exception:  # noqa: BLE001
                     detail = str(e)
                 # 429 means the server did not handle the request, so waiting and resending is safe.
@@ -208,6 +232,8 @@ PAGES_LOBBY = "https://zhixuli0406.github.io/agent-arena/web/index.html"
 IDENTITY_PATH = Path(os.environ.get("ARENA_IDENTITY", Path.home() / ".config" / "agent-arena" / "identity.json"))
 LINK_CODE_RE = re.compile(r"[A-Z0-9]{6,12}")
 SAFE_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+MATCH_ID_RE = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}")                    # server/runtime.py MATCH_ID_RE
+SERVER_URL_RE = re.compile(r"https://[a-z0-9.-]+(:\d{1,5})?")
 _public_bases: set[str] = set()          # servers that server.json actually pointed to (this run)
 
 
@@ -215,10 +241,10 @@ def discover_server(url: str = DISCOVERY_URL) -> str:
     """The public lobby's live server (the free server rotates its URL every few hours)."""
     with urllib.request.urlopen(urllib.request.Request(url, headers={"Accept": "application/json"}), timeout=15) as r:
         server = str(json.loads(r.read(64 * 1024).decode()).get("server", ""))
-    parsed = urllib.parse.urlparse(server)
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise ValueError("server.json does not point to an https server")
     server = server.rstrip("/")
+    # Just an origin: anything else in it would reach the agent as text (arena_status shows the server URL)
+    if not SERVER_URL_RE.fullmatch(server):
+        raise ValueError("server.json does not point to an https server")
     _public_bases.add(server)
     return server
 
@@ -365,7 +391,7 @@ class AgentLink:
                     elif event == "match" and isinstance(data, dict) and isinstance(data.get("token"), str):
                         mid = str(data.get("match_id", ""))
                         # a reconnect re-sends recent seats; remember an id only once its seat is really queued
-                        if SAFE_ID.fullmatch(mid) and mid not in self.seen and self.seats.qsize() < MAX_HELD:
+                        if MATCH_ID_RE.fullmatch(mid) and mid not in self.seen and self.seats.qsize() < MAX_HELD:
                             self.seen.append(mid)
                             self.seats.put(data)
                     if self._stop.is_set():
@@ -402,6 +428,11 @@ def clean(text: Any) -> str:
     return _CTRL_RE.sub("", str(text))
 
 
+def clean_line(text: Any) -> str:
+    """One-line fields (names, rosters, ids): line breaks would let someone else's name fake a status line."""
+    return " ".join(clean(text).split())
+
+
 def status(msg: str) -> None:
     sys.stdout.write("\r\033[K" + msg)
     sys.stdout.flush()
@@ -427,7 +458,7 @@ def _roster(players: list[dict[str, Any]]) -> str:
     sides: dict[str, list[str]] = {}
     for p in players:
         sides.setdefault(p.get("side") or "", []).append(f"{p['name']}（{p['rating']}）")
-    return clean(" vs ".join("、".join(v) for v in sides.values()))
+    return clean_line(" vs ".join("、".join(v) for v in sides.values()))
 
 
 def follow_ticket(api: Api, tid: str) -> str:
@@ -468,7 +499,7 @@ def host_party(api: Api, mode: str, fmt: str, need: int) -> str:
     try:
         while True:
             v = api.get(f"/api/lobby/parties/{code}")
-            roster = clean("、".join(m["name"] for m in v["members"]))
+            roster = clean_line("、".join(m["name"] for m in v["members"]))
             status(t("party_status", code=code, roster=roster, n=len(v["members"]), need=need))
             if len(v["members"]) >= need:
                 print()
@@ -489,7 +520,7 @@ def join_party(api: Api, code: str) -> str:
             if v.get("ticket_id"):
                 print()
                 return follow_ticket(api, v["ticket_id"])
-            roster = clean("、".join(m["name"] for m in v["members"]))
+            roster = clean_line("、".join(m["name"] for m in v["members"]))
             status(t("party_status", code=code, roster=roster, n=len(v["members"]), need=v["max"]))
             time.sleep(1)
     except KeyboardInterrupt:
@@ -525,7 +556,7 @@ def _wait_room(api: Api, code: str, host: bool, min_players: int) -> str:
                 print("\n" + t("started", mid=r["match_id"]))
                 return r["match_id"]
             members = r["members"]
-            roster = clean("、".join(m["name"] + ("✓" if m["ready"] else "…") for m in members))
+            roster = clean_line("、".join(m["name"] + ("✓" if m["ready"] else "…") for m in members))
             status(t("room_status", code=r["code"], n=len(members), size=r["size"], roster=roster))
             if host and len(members) >= min_players and all(m["ready"] for m in members):
                 try:
@@ -664,7 +695,7 @@ def sse_events(url: str, headers: dict[str, str], timeout: float = 60) -> Iterat
     """Read one SSE connection, yielding (event name, parsed JSON data or None). Size-capped per event.
     Network errors propagate; callers decide whether to reconnect."""
     req = urllib.request.Request(url, headers={"Accept": "text/event-stream", **headers})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with _opener.open(req, timeout=timeout) as resp:
         event, data, size = "message", [], 0
         for raw in _bounded_lines(resp, MAX_EVENT_BYTES):
             if raw is None:              # over-long line: already discarded, drop this event too
@@ -705,7 +736,7 @@ def stream_events(api: Api, token: str) -> Iterator[tuple[str, dict | None]]:
         if event != "message":
             continue
         rnd = obs.get("round") if isinstance(obs, dict) else None
-        ok = (isinstance(rnd, int) and not isinstance(rnd, bool)) or (isinstance(rnd, str) and SAFE_ID.fullmatch(rnd))
+        ok = isinstance(rnd, int) and not isinstance(rnd, bool) and 0 < rnd < 10_000      # the server numbers rounds 1, 2, …
         if not isinstance(obs, dict) or not ok:
             yield "bad", None
         else:

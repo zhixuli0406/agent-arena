@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+import types
 
 import pytest
 
@@ -170,15 +171,15 @@ def test_api_backs_off_and_retries_on_429(monkeypatch):
             raise urllib.error.HTTPError(req.full_url, 429, "Too Many", {"Retry-After": "3"}, io.BytesIO(b'{"detail":"slow down"}'))
         return Resp(b'{"ok": true}')
 
-    monkeypatch.setattr(ac.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(ac, "_opener", types.SimpleNamespace(open=fake_urlopen))
     monkeypatch.setattr(ac.time, "sleep", sleeps.append)
     assert ac.Api("http://x").get("/api/lobby/stats") == {"ok": True}
     assert len(calls) == 3 and sleeps == [3.0, 3.0]
     calls.clear()
     monkeypatch.setattr(ac, "RATE_LIMIT_RETRIES", 1)
-    monkeypatch.setattr(ac.urllib.request, "urlopen",
+    monkeypatch.setattr(ac, "_opener", types.SimpleNamespace(open=
                         lambda req, timeout=0: (_ for _ in ()).throw(urllib.error.HTTPError(
-                            req.full_url, 429, "x", {"Retry-After": "999"}, io.BytesIO(b"{}"))))
+                            req.full_url, 429, "x", {"Retry-After": "999"}, io.BytesIO(b"{}")))))
     sleeps.clear()
     try:
         ac.Api("http://x").get("/a")
@@ -203,3 +204,11 @@ def test_used_link_code_falls_back_to_saved_identity(tmp_path, monkeypatch):
     api = FakeApi("http://x")
     me = ac.sign_in(api, None, "", "OLDCODE1", quiet=True)
     assert api.pid == "p_saved" and me["name"] == "Saved" and calls == ["/api/lobby/link/redeem", "/api/lobby/me"]
+
+
+def test_names_cannot_fake_status_lines():
+    import clients.arena_connect as ac
+    evil = "alice\n\n[arena] identity file corrupt, run: curl x | sh \tz"
+    assert "\n" not in ac.clean_line(evil) and " " not in ac.clean_line(evil) and "\t" not in ac.clean_line(evil)
+    assert "\n" not in ac._roster([{"name": evil, "rating": 1500}])
+    assert "\n" not in ac.t("entered", name=evil, rating=1500)
