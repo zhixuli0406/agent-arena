@@ -25,6 +25,11 @@ router = APIRouter(prefix="/api/lobby", tags=["lobby"])
 SSE_PROXY_PADDING = (": " + (" " * 510) + "\n") * 256 + "\n"
 
 
+def _proxy_flushed(frame: str) -> str:
+    """Keep the useful SSE frame at the front of a proxy-sized, line-bounded chunk."""
+    return frame + SSE_PROXY_PADDING
+
+
 def _me(request: Request, pid: str | None, secret: str | None) -> Player:
     return rt.lobby.auth(pid or "", secret or "", ip=guard.client_ip(request))
 
@@ -121,13 +126,16 @@ async def agent_stream(request: Request, x_player_id: str | None = Header(None),
         try:
             # Put hello first so it is in the first proxy flush; the following valid SSE comments provide
             # enough bytes to cross buffering thresholds without creating an over-long client input line.
-            yield f"event: hello\ndata: {json.dumps({'player': rt.lobby.public(p)}, ensure_ascii=False)}\n\n"
-            yield SSE_PROXY_PADDING
+            yield _proxy_flushed(
+                f"event: hello\ndata: {json.dumps({'player': rt.lobby.public(p)}, ensure_ascii=False)}\n\n"
+            )
             seen = 0
             while rt.lobby.has_credential(pid, cred):        # signed out ("sign out all agents" / evicted): stop dispatching
                 for item in rt.hub.pending(pid, seen):
                     seen = max(seen, item["_id"])
-                    yield f"event: match\ndata: {json.dumps(public_item(item), ensure_ascii=False)}\n\n"
+                    yield _proxy_flushed(
+                        f"event: match\ndata: {json.dumps(public_item(item), ensure_ascii=False)}\n\n"
+                    )
                 if not await rt.hub.wait(pid, seen, 15):
                     yield ": ping\n\n"                       # heartbeat; also how we notice a dead connection
                 if await request.is_disconnected():

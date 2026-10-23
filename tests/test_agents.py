@@ -12,6 +12,7 @@ from server import runtime as rt
 from server.agents import GRACE, AgentHub
 from server.app import app
 from server.lobby import LINK_TTL, Lobby
+from server.lobby_api import _proxy_flushed
 
 
 @pytest.fixture(autouse=True)
@@ -31,6 +32,15 @@ def hdr(r):
 
 def reg(c, name):
     return c.post("/api/lobby/players", json={"name": name}).json()
+
+
+def test_proxy_flushed_keeps_event_first_and_uses_bounded_comment_lines():
+    frame = 'event: hello\ndata: {"ok": true}\n\n'
+    wire = _proxy_flushed(frame)
+    comments = [line for line in wire.splitlines() if line.startswith(":")]
+    assert wire.startswith(frame)
+    assert sum(len(line) for line in comments) >= 128 * 1024
+    assert max(map(len, comments)) <= 512
 
 
 def test_queue_and_ready_need_the_players_own_agent():
