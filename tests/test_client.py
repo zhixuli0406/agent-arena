@@ -93,9 +93,9 @@ def test_fence_text_follows_lang():
     ({"LANG": "zh_Hans_SG"}, "zh-CN"),
     ({"LANG": "en_US.UTF-8"}, "en"),
     ({"LANG": "ja_JP.UTF-8"}, "ja"),
-    ({"LANG": "fr_FR.UTF-8"}, "zh-TW"),
-    ({"LANG": "C.UTF-8"}, "zh-TW"),
-    ({}, "zh-TW"),
+    ({"LANG": "fr_FR.UTF-8"}, "en"),          # nothing we support: English
+    ({"LANG": "C.UTF-8"}, "en"),
+    ({}, "en"),
     ({"LC_ALL": "ja_JP.UTF-8", "LANG": "en_US.UTF-8"}, "ja"),
 ])
 def test_detect_lang(env, expected):

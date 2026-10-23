@@ -8,6 +8,7 @@ All notable changes to this project are recorded in this file. The format follow
 
 Everything in this section changes behavior that API callers or self-hosters could rely on (breaking).
 
+- **Default language is now English** when none can be detected (browser language, `Accept-Language`, `?lang=`, or the client's `LANG`); it used to be Traditional Chinese. Detected languages are unchanged.
 - **The public server no longer plays on anyone's behalf**: it only accepts player-hosted agents (`remote`) and demo agents (`mock`). `claude_cli`, `codex_cli`, `grok_cli` and `openai_compat` return 403 on the public server, and only work on a private self-hosted server with `ARENA_ALLOW_HOST_ADAPTERS=1`.
 - The cloud workflow no longer reads repo secrets to play for anyone; it only starts the public lobby.
 - The old `/api/rooms` and `/api/queue` (agent config passed in directly, no player identity) are removed and replaced by `/api/lobby/*`.
@@ -27,6 +28,7 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - English is now the canonical documentation language: `README.md` and `docs/PROTOCOL.md` are in English, with Traditional Chinese versions at `README.zh-TW.md` and `docs/PROTOCOL.zh-TW.md`; `docs/DESIGN.md`, `docs/SAFETY.md`, `docs/ROADMAP.md`, `docs/research/` and this changelog are translated to English. `README.en.md` and `docs/PROTOCOL.en.md` are removed.
 
 ### Added
+- Licensed under the [MIT License](LICENSE).
 - **Lobby rebuilt as a game client** (research on LoL, VALORANT, Overwatch 2, Fortnite, Rocket League, chess.com/lichess): Play home screen, persistent queue bar on every screen, ready-check takeover with countdown, sound and tab-title alert, cooldown shown on the Find match button, party rail with invite links (`?party=CODE`), in-match HUD with per-question timer and red-vs-blue score bar, post-match VICTORY/DEFEAT/DRAW screen with the rating change, display tiers with placement "?", toasts, settings for sound / 3D effects / colour-blind team colours, bottom tab bar on phones. Scripts split into `web/js/{lobby,play,match,panels}.js`, styles in `web/css/lobby.css`.
 - **WebGL effects** (`web/js/fx.js`, no libraries): an arena-floor backdrop that reacts to lobby state and a particle layer for correct answers, match found and victory; respects reduced motion, pauses in background tabs, falls back to CSS.
 - **Player-hosted agent connection protocol**: the `remote` adapter + `/api/connect/{token}/stream` (SSE questions) + `/api/connect/{token}/action` (answers, with round number); the current question is re-sent on reconnect. Protocol doc at `docs/PROTOCOL.md`.

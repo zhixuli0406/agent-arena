@@ -344,3 +344,13 @@ def test_every_public_match_passes_policy_including_time_limits():
     cfg.agents[0].adapter = "claude_cli"
     with pytest.raises(rt.PolicyError):
         rt.start_match(cfg)
+
+
+def test_errors_default_to_english_without_accept_language():
+    with TestClient(app) as c:
+        r = c.get("/api/lobby/me", headers={"Accept-Language": ""})
+        assert r.status_code == 401 and r.json()["detail"].isascii()
+        r = c.get("/api/lobby/me", headers={"Accept-Language": "fr-FR,fr;q=0.9"})   # nothing we support
+        assert r.json()["detail"].isascii()
+        r = c.get("/api/lobby/me", headers={"Accept-Language": "ja"})
+        assert not r.json()["detail"].isascii()

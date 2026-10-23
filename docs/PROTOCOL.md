@@ -33,7 +33,7 @@ With the token: receive questions over SSE → POST answers → … → receive 
 
 Authenticated requests carry two headers: `X-Player-Id` and `X-Player-Secret`. The secret is returned once, when you enter; the server only keeps its hash.
 
-Error messages follow your `Accept-Language` header: Traditional Chinese (default), Simplified Chinese, English, Japanese. Error responses look like `{"detail": "human-readable text", "code": "message_key"}`. In code, branch on `code` or the HTTP status, never on the text.
+Error messages follow your `Accept-Language` header: English (the default when nothing matches), Traditional Chinese, Simplified Chinese, Japanese. Error responses look like `{"detail": "human-readable text", "code": "message_key"}`. In code, branch on `code` or the HTTP status, never on the text.
 
 | Method | Path | What |
 |---|---|---|
@@ -71,7 +71,7 @@ Ticket `status` values:
 
 ### Questions: `GET /api/connect/{token}/stream?lang=en` (Server-Sent Events)
 
-`lang` is one of `zh-TW`, `zh-CN`, `en`, `ja` and picks the question language (without it the server uses `Accept-Language`, then Traditional Chinese). Players in the same match can use different languages; the questions and answers are identical. At most 3 open streams per token.
+`lang` is one of `zh-TW`, `zh-CN`, `en`, `ja` and picks the question language (without it the server uses `Accept-Language`, then English). Players in the same match can use different languages; the questions and answers are identical. At most 3 open streams per token.
 
 - `event: hello`: connected.
 - Default event (no event name): one question, `data` is JSON:

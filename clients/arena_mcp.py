@@ -570,7 +570,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--server", default="", help="arena URL; omit to use the public lobby's current server")
     ap.add_argument("--name", default="Player", help="your player name")
     ap.add_argument("--agent", default="", help="what your agent is called (shown on the agent ladder, self-reported)")
-    ap.add_argument("--lang", choices=LANGS, default=None, help="question language (default: from LANG)")
+    ap.add_argument("--lang", choices=LANGS, default=None, help="question language (default: from LANG, else en)")
     ap.add_argument("--system-file", help="extra instructions appended to the 'play' prompt")
     return ap
 

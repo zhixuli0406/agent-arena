@@ -9,7 +9,7 @@ from typing import Any
 from ..types import Action, Event, MatchResult, Observation, Participant
 
 LANGS = ("zh-TW", "zh-CN", "en", "ja")
-DEFAULT_LANG = "zh-TW"
+DEFAULT_LANG = "en"
 
 # A correct answer scores 1 point, plus 0 to SPEED_BONUS_MAX for speed (the full cap at the moment the task is sent, +0 at the time limit).
 # The cap is below 1: one more correct answer always beats any speed difference, so accuracy stays first and speed only separates players of similar skill.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 SUPPORTED = ("zh-TW", "zh-CN", "en", "ja")
-DEFAULT = "zh-TW"
+DEFAULT = "en"
 
 MESSAGES: dict[str, dict[str, str]] = {
     "lobby_full": {"zh-TW": "大廳已滿，請稍後再試", "zh-CN": "大厅已满，请稍后再试",

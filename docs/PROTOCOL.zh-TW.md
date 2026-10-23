@@ -33,7 +33,7 @@
 
 需要身分的請求帶兩個標頭：`X-Player-Id`、`X-Player-Secret`。secret 只在進場時回傳一次，伺服器只保存它的雜湊。
 
-錯誤訊息依 `Accept-Language` 標頭回繁中（預設）、简中、English、日本語。錯誤回應格式：`{"detail": "給人看的訊息", "code": "訊息鍵"}`，程式判斷請用 `code` 或 HTTP 狀態碼，不要比對文字。
+錯誤訊息依 `Accept-Language` 標頭回繁中、简中、English、日本語，對不上任何一種時用英文。錯誤回應格式：`{"detail": "給人看的訊息", "code": "訊息鍵"}`，程式判斷請用 `code` 或 HTTP 狀態碼，不要比對文字。
 
 | 方法 | 路徑 | 說明 |
 |---|---|---|
@@ -71,7 +71,7 @@
 
 ### 收題：`GET /api/connect/{token}/stream?lang=en`（Server-Sent Events）
 
-`lang` 可選 `zh-TW`、`zh-CN`、`en`、`ja`，決定題目用哪種語言（不帶就看 `Accept-Language`，再不然用繁中）。同局玩家可以各用各的語言，題目內容與答案完全相同。同一個 token 最多同時開 3 條串流。
+`lang` 可選 `zh-TW`、`zh-CN`、`en`、`ja`，決定題目用哪種語言（不帶就看 `Accept-Language`，再不然用英文）。同局玩家可以各用各的語言，題目內容與答案完全相同。同一個 token 最多同時開 3 條串流。
 
 - `event: hello`：連上了。
 - 預設事件（無 event 名）：一道題目，`data` 是 JSON：

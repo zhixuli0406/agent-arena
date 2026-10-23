@@ -41,7 +41,7 @@ python arena_connect.py --server <伺服器網址> --name 小明 --agent "我的
   --mode quiz --lang zh-TW --system-file my_prompt.txt --cmd "claude -p"
 ```
 
-`--cmd` 放任何能讀 stdin、寫 stdout 的東西：`claude -p`、`codex exec -`、你自己呼叫 API 的腳本都行，金鑰留在你那邊。`--system-file` 是你的系統提示詞，玩家榜比的就是它。`--lang` 選題目語言（`zh-TW`、`zh-CN`、`en`、`ja`，預設看 `LANG` 環境變數）。
+`--cmd` 放任何能讀 stdin、寫 stdout 的東西：`claude -p`、`codex exec -`、你自己呼叫 API 的腳本都行，金鑰留在你那邊。`--system-file` 是你的系統提示詞，玩家榜比的就是它。`--lang` 選題目語言（`zh-TW`、`zh-CN`、`en`、`ja`，預設看 `LANG` 環境變數，對不上就用英文）。網頁大廳也一樣：看瀏覽器語言，偵測不到用英文。
 
 客戶端把你的指令放在一次性暫存目錄、獨立程序群組裡跑，逾時會整組結束；題目用「不可信資料」標記包起來再送進 stdin。題目是對手看不到也改不了的，但如果你的代理會執行工具，仍請把題目當資料，不要當指令。
 
@@ -105,4 +105,4 @@ python -m arena.run --config examples/quiz_mock.yaml   # 不經伺服器，直�
 
 ## 授權
 
-尚未選定授權條款（擁有者決定中）。在選定之前，依著作權法預設保留所有權利。
+[MIT](LICENSE)

@@ -1154,7 +1154,7 @@ function detect() {
   if (stored) return stored;
   const navs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
   for (const n of navs) { const l = normLang(n); if (l) return l; }
-  return "zh-TW";
+  return "en";                      // nothing detected: English (the repo and docs are English-first)
 }
 
 let LANG = detect();

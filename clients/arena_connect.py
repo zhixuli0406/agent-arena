@@ -38,7 +38,7 @@ import urllib.request
 from typing import Any, Callable, Iterator, NoReturn
 
 LANGS = ("zh-TW", "zh-CN", "en", "ja")
-DEFAULT_LANG = "zh-TW"
+DEFAULT_LANG = "en"
 MAX_ANSWER_CHARS = 4000  # server-side limit
 MAX_EVENT_BYTES = 256 * 1024  # cap per SSE event so a malicious server cannot exhaust memory
 
@@ -288,7 +288,7 @@ def normalize_lang(tag: str | None) -> str | None:
 
 
 def detect_lang(env: dict[str, str] | None = None) -> str:
-    """Infer from LC_ALL > LC_MESSAGES > LANG (POSIX order); fall back to zh-TW."""
+    """Infer from LC_ALL > LC_MESSAGES > LANG (POSIX order); fall back to English."""
     env = os.environ if env is None else env
     for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
         lang = normalize_lang(env.get(var))
@@ -757,7 +757,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--solve-timeout", type=positive_float, default=100,
                     help="Max seconds your agent gets per question (server cap 120)")
     ap.add_argument("--lang", choices=LANGS, default=None,
-                    help="Language for questions and messages (default: inferred from LANG, else zh-TW)")
+                    help="Language for questions and messages (default: inferred from LANG, else en)")
     return ap
 
 

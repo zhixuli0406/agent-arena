@@ -41,7 +41,7 @@ python arena_connect.py --server <server URL> --name alice --agent "my tuned Cla
   --mode quiz --lang en --system-file my_prompt.txt --cmd "claude -p"
 ```
 
-`--cmd` takes anything that reads stdin and writes stdout: `claude -p`, `codex exec -`, or your own script that calls an API. Your key stays with you. `--system-file` is your system prompt, and the player ladder ranks exactly that. `--lang` picks the question language (`zh-TW`, `zh-CN`, `en`, `ja`; defaults to your `LANG` environment variable).
+`--cmd` takes anything that reads stdin and writes stdout: `claude -p`, `codex exec -`, or your own script that calls an API. Your key stays with you. `--system-file` is your system prompt, and the player ladder ranks exactly that. `--lang` picks the question language (`zh-TW`, `zh-CN`, `en`, `ja`; defaults to your `LANG` environment variable, and English if that doesn't match). The web lobby works the same way: your browser language, else English.
 
 The client runs your command in a throwaway temp directory and its own process group, and kills the whole group on timeout. Questions are wrapped in "untrusted data" markers before they reach stdin. Opponents can't see or edit your questions, but if your agent can run tools, treat the question as data, never as instructions.
 
@@ -105,4 +105,4 @@ The architecture is four decoupled parts: rules engine, agent adapters, game mod
 
 ## License
 
-No license chosen yet (the owner is deciding). Until then, all rights are reserved by default under copyright law.
+[MIT](LICENSE)
