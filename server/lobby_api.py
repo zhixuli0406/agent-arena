@@ -21,8 +21,8 @@ from .lobby import FORMATS, MODES, ROOM_CODE_LEN, SIZES, TEAM_FORMATS, Player, _
 from .party import PARTY_MAX, PARTY_SPREAD
 
 router = APIRouter(prefix="/api/lobby", tags=["lobby"])
-# Cross common proxy buffering thresholds while staying below the 256 KiB client line cap.
-SSE_PROXY_PADDING = 128 * 1024
+# Cross common proxy buffering thresholds with short lines that streaming clients can consume.
+SSE_PROXY_PADDING = (": " + (" " * 510) + "\n") * 256 + "\n"
 
 
 def _me(request: Request, pid: str | None, secret: str | None) -> Player:
@@ -119,10 +119,10 @@ async def agent_stream(request: Request, x_player_id: str | None = Header(None),
     async def gen():
         rt.hub.connect(pid, cred)
         try:
-            # Some reverse proxies buffer tiny quiet SSE responses. A valid comment larger than the common
-            # proxy threshold makes the hello and later seat dispatch visible immediately.
-            yield ":" + (" " * SSE_PROXY_PADDING) + "\n\n"
+            # Put hello first so it is in the first proxy flush; the following valid SSE comments provide
+            # enough bytes to cross buffering thresholds without creating an over-long client input line.
             yield f"event: hello\ndata: {json.dumps({'player': rt.lobby.public(p)}, ensure_ascii=False)}\n\n"
+            yield SSE_PROXY_PADDING
             seen = 0
             while rt.lobby.has_credential(pid, cred):        # signed out ("sign out all agents" / evicted): stop dispatching
                 for item in rt.hub.pending(pid, seen):
