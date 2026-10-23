@@ -21,7 +21,8 @@ from .lobby import FORMATS, MODES, ROOM_CODE_LEN, SIZES, TEAM_FORMATS, Player, _
 from .party import PARTY_MAX, PARTY_SPREAD
 
 router = APIRouter(prefix="/api/lobby", tags=["lobby"])
-SSE_PROXY_PADDING = 4096
+# Cross common proxy buffering thresholds while staying below the 256 KiB client line cap.
+SSE_PROXY_PADDING = 128 * 1024
 
 
 def _me(request: Request, pid: str | None, secret: str | None) -> Player:
