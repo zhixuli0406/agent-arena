@@ -6,7 +6,8 @@ name: Arena free-cloud server
 # a schedule for near-continuous uptime (Actions is free for public repos).
 #
 # This server holds and uses no one's model keys: players connect their own agents (with their own keys)
-# via connect tokens, and the public policy only allows remote (player-provided) and mock (demo) agents.
+# via connect tokens. Visibly labelled, unrated House agents use the deterministic mock adapter as a
+# low-traffic fallback; the public policy only allows remote (player-provided) and mock agents.
 #
 # Privilege separation: the write token is used only by git commands under the runner account (via env
 # vars, never written to .git/config); the public-facing uvicorn runs as a separate system account "arena"
@@ -127,6 +128,7 @@ jobs:
           # Server output goes to a runner-private file, not the public job log (prevents forged workflow commands)
           ( cd /opt/arena && sudo setpriv --reuid=arena --regid=arena --init-groups --no-new-privs \
               env -i PATH=/usr/bin:/bin HOME=/home/arena LD_LIBRARY_PATH="$pythonLocation/lib" \
+              ARENA_HOUSE_AGENTS=4 ARENA_HOUSE_SEED_MATCHES=3 \
               "$PY" -m uvicorn server.app:app --host 127.0.0.1 --port 8798 --log-level warning \
               --limit-concurrency 300 --timeout-keep-alive 5 > "$RUNNER_TEMP/server.log" 2>&1 ) &
           ./cloudflared tunnel --url http://127.0.0.1:8798 --no-autoupdate > cf.log 2>&1 &

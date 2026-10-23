@@ -160,16 +160,18 @@ async function health() {
   catch (e) { if (e.status === 429) return true; setSrv("off"); return false; }
 }
 let statsPause = 0, lastRediscover = 0;
-function setOnlineCount(value) {
+function setOnlineCount(value, houseValue = 0) {
   const n = Number(value), ok = value !== null && Number.isFinite(n) && n >= 0;
   const count = ok ? Math.floor(n) : 0;
   const next = ok ? fmtNum(count) : "–";
   if ($("stOnline").textContent !== next) $("stOnline").textContent = next;
+  const house = Number(houseValue);
+  $("stHouse").textContent = ok && Number.isFinite(house) && house > 0 ? t("st_house", { n: fmtNum(Math.floor(house)) }) : "";
   $("onlineDot").className = "dot" + (ok ? " on" : "");
 }
 async function stats() {
   if (Date.now() < statsPause) return;
-  try { S.stats = await api("GET", "/api/lobby/stats"); setOnlineCount(S.stats.online); setSrv("on"); }
+  try { S.stats = await api("GET", "/api/lobby/stats"); setOnlineCount(S.stats.online, S.stats.house_agents); setSrv("on"); }
   catch (e) {
     if (e.status === 429) { statsPause = Date.now() + e.retryAfter * 1000; return; }
     setOnlineCount(null);

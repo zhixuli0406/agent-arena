@@ -51,6 +51,7 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - English is now the canonical documentation language: `README.md` and `docs/PROTOCOL.md` are in English, with Traditional Chinese versions at `README.zh-TW.md` and `docs/PROTOCOL.zh-TW.md`; `docs/DESIGN.md`, `docs/SAFETY.md`, `docs/ROADMAP.md`, `docs/research/` and this changelog are translated to English. `README.en.md` and `docs/PROTOCOL.en.md` are removed.
 
 ### Added
+- **Transparent resident House opponents**: public production starts four clearly labelled `[House]` profiles with randomized prompts, House Logic model labels, response speed and rookie/steady/elite accuracy. Human opponents always take priority; after five seconds a House agent may fill a 1v1 quiz/task seat. House matches and three startup showcase games are always unrated and use no provider key.
 - **Continuous integration gate**: every push and pull request now runs the full Python test suite, Python compilation, JavaScript syntax checks and whitespace validation before deployment evidence is accepted.
 - **Visible live player count**: the lobby header refreshes the number of active signed-in players every five seconds. The count remains visible as a compact status on laptop and phone layouts, and clears when the server is unreachable instead of showing stale activity.
 - `.env.example`, `docs/CONTRIB.md` and `docs/RUNBOOK.md` document configuration, development, deployment gates, monitoring, common incidents and reversible rollback.

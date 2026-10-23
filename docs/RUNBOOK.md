@@ -64,6 +64,8 @@ Host-adapter mode is intentionally loopback-only and must never be tunneled or e
 | `ARENA_LADDER` | `runs/ladder.json` | Ladder persistence path |
 | `ARENA_STATE` | `runs/lobby_state.json` | Lobby identity and rating state |
 | `ARENA_MAX_LIVE` | `50` | Concurrent match cap |
+| `ARENA_HOUSE_AGENTS` | `0` | Transparent resident opponents; public workflow sets `4` |
+| `ARENA_HOUSE_SEED_MATCHES` | `0` | Unrated House showcase matches started after boot; public workflow sets `3` |
 | `ARENA_CORS_REGEX` | restricted built-in policy | Public allowed-origin override |
 | `ARENA_ALLOW_HOST_ADAPTERS` | off | Enables local CLI/model adapters and private match creation |
 | `ARENA_ADMIN_TOKEN` | empty | Required admin secret for private custom match creation |
@@ -79,7 +81,7 @@ Never put secrets in committed `.env` files, match configuration, URLs, logs or 
 ## Monitoring
 
 - `/api/health`: service status, queues and live-match count
-- `/api/lobby/stats`: public lobby activity
+- `/api/lobby/stats`: public lobby activity, including `house_agents`
 - GitHub Actions job summary: current tunnel URL
 - `server.json`: stable client-discovery pointer and update time
 - `arena.security` logger: rate-limit and security events
@@ -89,6 +91,7 @@ Expected public behavior:
 - The server rotates roughly every five hours.
 - The stable Pages lobby re-reads `server.json` after failed health checks.
 - The deployment workflow stays running while the public server is healthy.
+- Public production reports four House agents; three startup showcases appear as `source: "house"`. House players are labelled `[House]`, fill only quiz/task 1v1 after five seconds, and never alter ratings.
 
 ## Common incidents
 

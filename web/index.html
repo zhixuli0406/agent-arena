@@ -21,10 +21,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Barlow:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/lobby.css?v=20261024.1">
-<script src="js/i18n.js?v=20261024.3" defer></script>
+<script src="js/i18n.js?v=20261024.4" defer></script>
 <script src="js/common.js" defer></script>
 <script src="js/fx.js" defer></script>
-<script src="js/lobby.js?v=20261024.1" defer></script>
+<script src="js/lobby.js?v=20261024.2" defer></script>
 <script src="js/play.js" defer></script>
 <script src="js/match.js" defer></script>
 <script src="js/panels.js" defer></script>
@@ -49,7 +49,7 @@
     <span class="pill agent hide" id="agentPill"><span class="dot" id="agentDot"></span><span id="agentText" data-i18n="agent_off">Agent offline</span></span>
     <span class="pill opt" id="srvChip"><span class="dot" id="srvDot"></span><span id="srvText" data-i18n="srv_wait">Connecting</span></span>
     <span class="pill online-pill" id="onlinePill" role="status" aria-live="polite">
-      <span class="dot" id="onlineDot" aria-hidden="true"></span><span class="online-label" data-i18n="st_online">Online now</span> <b id="stOnline">–</b>
+      <span class="dot" id="onlineDot" aria-hidden="true"></span><span class="online-label" data-i18n="st_online">Online now</span> <b id="stOnline">–</b><span id="stHouse"></span>
     </span>
     <span id="langHost"></span>
     <button class="iconbtn" id="btnSettings" aria-haspopup="true" aria-expanded="false" data-i18n-aria="set_h" aria-label="Settings">⚙</button>
@@ -113,7 +113,7 @@
           <button class="btn big" id="btnQueue" data-i18n="btn_queue">Find match</button>
           <div class="sum"><b id="qSummary"></b><span class="note" id="qFmtHelp"></span></div>
         </div>
-        <div class="help" data-i18n="q_help">Matches are grouped by rating, and the search widens the longer you wait. Accept within 15 seconds when a match is found, or sit out a 30-second cooldown.</div>
+        <div class="help" data-i18n="q_help">Matches are grouped by rating. In quiz and task queues, a labelled House opponent fills in after 5 seconds without another person; that game is unrated. Accept within 15 seconds when a match is found, or sit out a 30-second cooldown.</div>
       </div>
       <aside class="rail">
         <div class="slab" id="party">

@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 import secrets
 import time
@@ -23,6 +24,7 @@ from arena.engine import MatchReport, run_match
 from arena.types import AgentSpec, MatchConfig
 
 from .agents import AgentHub
+from .house import HouseManager, HouseProfile, scripted_answers
 from .i18n import I18nError
 from .lobby import Lobby, Player
 from .question_bank import PUBLIC_CTF_CONFIG, pick
@@ -37,6 +39,8 @@ PUBLIC_ADAPTERS = {"remote", "mock"}
 ALLOW_HOST_ADAPTERS = os.environ.get("ARENA_ALLOW_HOST_ADAPTERS") == "1"
 MAX_LIVE_MATCHES = int(os.environ.get("ARENA_MAX_LIVE", "50"))
 MAX_LIVE_DEMOS = 5        # demo matches (mock vs mock) have their own quota so they can't take slots from real matches
+HOUSE_AGENT_COUNT = max(0, min(8, int(os.environ.get("ARENA_HOUSE_AGENTS", "0"))))
+HOUSE_SEED_MATCHES = max(0, min(6, int(os.environ.get("ARENA_HOUSE_SEED_MATCHES", "0"))))
 SLOT_TTL = 600  # how long to keep a connection slot after a match ends (so player clients receive the end signal)
 MATCH_TTL = 3600.0        # how long finished match summaries stay in memory
 TRANSCRIPT_TTL = 86400.0  # how long transcript files are kept
@@ -185,7 +189,9 @@ def match_summary(match_id: str) -> dict[str, Any]:
                 out["team_ranking"] = rep.result.details["team_ranking"]
                 out["team_scores"] = rep.result.details["team_scores"]
                 out["teams"] = rep.result.details["teams"]
-        out["rated"] = rep.rated
+        # The engine's rated flag says the result was healthy enough for ELO. Lobby policy can still
+        # make a healthy match explicitly unrated (rooms, anti-farming, or a House opponent).
+        out["rated"] = rep.rated and m.get("ranked", True)
         out["forfeits"] = public_faults(m["mode"], rep.forfeits)
     return out
 
@@ -240,22 +246,38 @@ def _ranked_today(player_ids: list[str], teams: dict[str, str] | None = None) ->
 def _lobby_start(mode: str, players: list[Player], ranked: bool = True,
                  teams: dict[str, str] | None = None) -> tuple[str, dict[str, str]]:
     """teams = {player_id: red/blue}: a team match. The winner is decided by team total score; individual ratings are compared only against the opposing team (arena/elo.py)."""
+    ranked = ranked and not any(p.house for p in players)
     ranked = ranked and _ranked_today([p.id for p in players], teams)
     tokens: dict[str, str] = {}
     agents: list[dict[str, Any]] = []
     agent_to_player: dict[str, str] = {}
     used: set[str] = set()
+    mode_config = pick(mode)
+    house_rng = random.Random(secrets.randbits(64))
     for p in players:
-        tok = secrets.token_urlsafe(12)
-        tokens[p.id] = tok
         aid, n = p.name, 2
         while aid in used:
             aid, n = f"{p.name}#{n}", n + 1
         used.add(aid)
         agent_to_player[aid] = p.id
-        agents.append({"id": aid, "adapter": "remote", "model": p.agent_label or "self-hosted",
-                       "prompt_author": p.id, "params": {"token": tok}, "team": (teams or {}).get(p.id, "")})
-    mode_config = pick(mode)
+        if p.house:
+            profile = HouseProfile.from_config(p.house_config)
+            answers = scripted_answers(mode_config, profile, house_rng)
+            agents.append({
+                "id": aid, "adapter": "mock", "model": profile.model,
+                "system_prompt": profile.prompt, "prompt_author": "house",
+                "params": {
+                    "answers": answers,
+                    "delay": profile.delay,
+                    "public_summaries": [f"House {profile.strength}: {profile.prompt}"] * len(answers),
+                },
+                "team": (teams or {}).get(p.id, ""),
+            })
+        else:
+            tok = secrets.token_urlsafe(12)
+            tokens[p.id] = tok
+            agents.append({"id": aid, "adapter": "remote", "model": p.agent_label or "self-hosted",
+                           "prompt_author": p.id, "params": {"token": tok}, "team": (teams or {}).get(p.id, "")})
     items = mode_config.get("questions") or mode_config.get("tasks") or []
     is_ctf = mode == "ctf"
     cfg = MatchConfig.from_dict({
@@ -276,13 +298,53 @@ def _lobby_start(mode: str, players: list[Player], ranked: bool = True,
 
     mid = start_match(cfg, on_done=_ladder, meta={"source": "lobby", "ranked": ranked, "pids": [p.id for p in players]})
     for p in players:                         # the seat token goes to the player's agent, never to the lobby page
-        hub.assign(p.id, {"match_id": mid, "token": tokens[p.id], "mode": mode, "ranked": ranked,
-                             "side": (teams or {}).get(p.id)})
+        if p.id in tokens:
+            hub.assign(p.id, {"match_id": mid, "token": tokens[p.id], "mode": mode, "ranked": ranked,
+                                 "side": (teams or {}).get(p.id)})
     return mid, tokens
 
 
 lobby = Lobby(_lobby_start)
 hub = AgentHub()          # agent standby channels: presence + seat dispatch
+
+
+def start_house_showcase(profiles: list[HouseProfile]) -> bool:
+    """Start one visibly labelled, unrated House-vs-House showcase match."""
+    if len(profiles) < 2 or live_count("house"):
+        return False
+    rng = random.Random(secrets.randbits(64))
+    mode = rng.choice(("quiz", "task"))
+    mode_config = pick(mode, rng=rng)
+    items = mode_config.get("questions") or mode_config.get("tasks") or []
+    agents = []
+    for profile in profiles[:2]:
+        answers = scripted_answers(mode_config, profile, rng)
+        agents.append({
+            "id": profile.name, "adapter": "mock", "model": profile.model,
+            "system_prompt": profile.prompt, "prompt_author": "house",
+            "params": {
+                "answers": answers,
+                "delay": profile.delay,
+                "public_summaries": [f"House {profile.strength}: {profile.prompt}"] * len(answers),
+            },
+        })
+    cfg = MatchConfig.from_dict({
+        "mode": mode, "mode_config": mode_config, "agents": agents, "ratings_path": "",
+        "timeout_seconds": 10, "max_wall_seconds": max(60, len(items) * 10 + 30),
+    })
+    start_match(cfg, meta={"source": "house", "ranked": False})
+    return True
+
+
+house = HouseManager(
+    lobby,
+    count=HOUSE_AGENT_COUNT,
+    seed_matches=HOUSE_SEED_MATCHES,
+    rng=random.Random(secrets.randbits(64)),
+    clock=time.monotonic,
+    live_match_of=live_match_of,
+    start_showcase=start_house_showcase,
+)
 
 
 def leaderboard(limit: int = 20) -> dict[str, Any]:

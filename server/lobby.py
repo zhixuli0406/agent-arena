@@ -19,7 +19,7 @@ import string
 import time
 import unicodedata
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Any, Callable
 
 from .i18n import I18nError
 from .party import PARTY_SPREAD, Party, PartyMixin
@@ -52,6 +52,7 @@ ROOM_OPEN_TTL = 3600.0    # reap unstarted rooms after this long idle
 ROOM_STARTED_TTL = 1800.0 # how long started rooms are kept (so members can still look up token / match_id)
 MATCH_BUDGET = 0.05       # max seconds per queue per tick spent matching (runs on the event loop; leftovers wait for the next tick)
 ANCHOR_RETRY = 3.0        # a ticket that failed as anchor waits this many seconds before trying again (avoids recomputing doomed combinations every second)
+HOUSE_FILL_DELAY = 5.0    # humans get a short window to find another human before a transparent House agent may fill the seat
 
 
 class LobbyError(I18nError):
@@ -72,6 +73,8 @@ class Player:
     ip: str = ""
     ips: list[str] = field(default_factory=list)   # source IPs of recent requests (for same-network checks; not persisted)
     extra_hashes: list[str] = field(default_factory=list)   # credentials minted through link codes (hashes only)
+    house: bool = False                 # server-operated, visibly labelled fallback opponent
+    house_config: dict[str, Any] = field(default_factory=dict)
 
     def saw_ip(self, ip: str) -> None:
         if ip and ip not in self.ips:
@@ -155,7 +158,8 @@ class Lobby(PartyMixin):
         self.dirty = False              # there are changes to persist
 
     # ---------------- Players ----------------
-    def register(self, name: str, agent_label: str = "", ip: str = "") -> Player:
+    def register(self, name: str, agent_label: str = "", ip: str = "", *, house: bool = False,
+                 house_config: dict[str, Any] | None = None) -> Player:
         if len(self.players) >= MAX_PLAYERS:
             self._reap_guests(force=True)
         if len(self.players) >= MAX_PLAYERS:
@@ -163,7 +167,8 @@ class Lobby(PartyMixin):
         clean = clean_text(name, NAME_MAX) or "Player"
         secret = secrets.token_urlsafe(18)
         p = Player(id="p_" + secrets.token_hex(5), name=clean, secret=secret, secret_hash=_hash(secret),
-                   agent_label=clean_text(agent_label, 40), last_seen=self._clock(), ip=ip)
+                   agent_label=clean_text(agent_label, 40), last_seen=self._clock(), ip=ip,
+                   house=house, house_config=dict(house_config or {}))
         p.saw_ip(ip)
         self.players[p.id] = p
         return p
@@ -180,7 +185,10 @@ class Lobby(PartyMixin):
         return p
 
     def public(self, p: Player) -> dict:
-        return {"id": p.id, "name": p.name, "rating": round(p.rating), "agent": p.agent_label, "games": p.games}
+        view = {"id": p.id, "name": p.name, "rating": round(p.rating), "agent": p.agent_label, "games": p.games}
+        if p.house:
+            view["house"] = True
+        return view
 
     def apply_rating(self, player_id: str, delta: float) -> None:
         p = self.players.get(player_id)
@@ -226,7 +234,7 @@ class Lobby(PartyMixin):
         if len(active) >= MAX_SEARCHING:
             raise LobbyError("queue_full", 503)
         # no limit for loopback (only seen in local development; on the public server Cloudflare supplies the source IP)
-        if _net_key(ip) and sum(1 for t in active if t.ip == ip) >= MAX_TICKETS_PER_IP:
+        if not player.house and _net_key(ip) and sum(1 for t in active if t.ip == ip) >= MAX_TICKETS_PER_IP:
             raise LobbyError("ip_tickets", 429, n=MAX_TICKETS_PER_IP)
         t = Ticket(id="t_" + secrets.token_hex(6), player_id=player.id, mode=mode, size=size, enqueued_at=now, ip=ip,
                    members=members, team_size=team_size)
@@ -287,7 +295,8 @@ class Lobby(PartyMixin):
 
     def _match_pool(self, mode: str, size: int, pool: list[Ticket], now: float) -> None:
         """First queued, first matched: each ticket in queue order becomes the anchor; sorting by rating plus binary search limits candidates to the rating window (avoids O(n²))."""
-        pool.sort(key=lambda t: t.enqueued_at)
+        # Human anchors and candidates go first. House seats are a fallback, never a reason to split two available humans.
+        pool.sort(key=lambda t: (self._ticket_has_house(t), t.enqueued_at))
         by_rating = sorted(pool, key=lambda t: self.players[t.player_id].rating)
         keys = [self.players[t.player_id].rating for t in by_rating]
         used: set[str] = set()
@@ -303,8 +312,9 @@ class Lobby(PartyMixin):
                 t for t in by_rating[lo:hi]
                 if t.id != anchor.id and t.id not in used
                 and abs(self.players[t.player_id].rating - ar) <= min(aw, self.window(t, now))
+                and self._house_pair_allowed(anchor, t, now)
             ]
-            cands.sort(key=lambda t: (abs(self.players[t.player_id].rating - ar), t.enqueued_at))
+            cands.sort(key=lambda t: (self._ticket_has_house(t), abs(self.players[t.player_id].rating - ar), t.enqueued_at))
             # Rated matches never pair two tickets from the same network (stops one person farming with two accounts).
             # Loopback is exempt: it only shows up in local development (on the public server Cloudflare supplies the source IP, which can't be spoofed as local).
             # Trade-off: family and friends behind the same NAT can't be matched together; they should use a custom room.
@@ -352,6 +362,18 @@ class Lobby(PartyMixin):
 
     def _ticket_rating(self, t: Ticket) -> float:
         return sum(self.players[m].rating for m in t.members) / len(t.members)
+
+    def _ticket_has_house(self, t: Ticket) -> bool:
+        return any(self.players[m].house for m in t.members)
+
+    def _house_pair_allowed(self, a: Ticket, b: Ticket, now: float) -> bool:
+        ah, bh = self._ticket_has_house(a), self._ticket_has_house(b)
+        if ah and bh:
+            return False
+        if not (ah or bh):
+            return True
+        human = b if ah else a
+        return now - human.enqueued_at >= HOUSE_FILL_DELAY
 
     def _ticket_nets(self, t: Ticket) -> set[str]:
         nets = {_net_key(t.ip)}
@@ -512,7 +534,8 @@ class Lobby(PartyMixin):
                 queues[key] = queues.get(key, 0) + len(t.members)
         return {
             "parties": len(self.parties),
-            "online": sum(1 for p in self.players.values() if now - p.last_seen < ONLINE_WINDOW),
+            "online": sum(1 for p in self.players.values() if not p.house and now - p.last_seen < ONLINE_WINDOW),
+            "house_agents": sum(1 for p in self.players.values() if p.house),
             "queues": queues,
             "searching": sum(queues.values()),
             "rooms_open": sum(1 for r in self.rooms.values() if r.status == "open"),
@@ -576,15 +599,17 @@ class Lobby(PartyMixin):
 
     def _launch(self, prop: Proposal) -> None:
         players = [self.players[m] for m in self._proposal_players(prop)]
+        ranked = not any(p.house for p in players)
         if prop.sides:
             sides = {m: prop.sides[tid] for tid in prop.ticket_ids for m in self.tickets[tid].members}
-            match_id, tokens = self._start(prop.mode, players, ranked=True, teams=sides)
+            match_id, tokens = self._start(prop.mode, players, ranked=ranked, teams=sides)
         else:
-            match_id, tokens = self._start(prop.mode, players, ranked=True)
+            match_id, tokens = self._start(prop.mode, players, ranked=ranked)
         now = self._clock()
         for tid in prop.ticket_ids:
             t = self.tickets[tid]
             t.match_id, t.side = match_id, prop.sides.get(tid)
+            t.ranked = ranked
             t.tokens = {m: tokens[m] for m in t.members if m in tokens}
             self.wait_samples.append(now - t.enqueued_at)
             self._end(t, "confirmed")
@@ -637,7 +662,7 @@ class Lobby(PartyMixin):
         return {"version": 1, "players": [
             {"id": p.id, "name": p.name, "rating": round(p.rating, 2), "games": p.games,
              "agent": p.agent_label, "secret_hash": p.secret_hash, "extra_hashes": list(p.extra_hashes)}
-            for p in self.players.values() if p.games > 0]}
+            for p in self.players.values() if p.games > 0 and not p.house]}
 
     def restore(self, data: dict) -> int:
         n = 0

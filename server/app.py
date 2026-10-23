@@ -71,6 +71,7 @@ async def _matchmaker() -> None:
     while True:
         try:
             rt.lobby.tick()
+            rt.house.tick()
             n += 1
             if n % 30 == 0:
                 rt.save_state()                       # flush rating changes to disk every 30 seconds
@@ -246,7 +247,7 @@ async def match_status(match_id: str) -> JSONResponse:
         "elo_deltas": rep.elo_deltas,
         "degraded": public_faults(m["mode"], rep.degraded_reasons),
         "forfeits": public_faults(m["mode"], rep.forfeits),
-        "rated": rep.rated,
+        "rated": rep.rated and m.get("ranked", True),
     })
 
 

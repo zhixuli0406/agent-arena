@@ -16,6 +16,7 @@ from server.app import _obs_payload, app
 from server.agents import AgentHub
 from server.lobby import Lobby
 from server.question_bank import PUBLIC_CTF_CONFIG
+from server.house import build_profiles
 
 
 @pytest.fixture(autouse=True)
@@ -364,6 +365,58 @@ def test_lobby_wall_clock_exceeds_items_times_timeout(monkeypatch):
         cfg = seen["cfg"]
         n = len(cfg.mode_config.get("questions") or cfg.mode_config.get("tasks"))
         assert cfg.max_wall_seconds > n * cfg.timeout_seconds    # stalling every question can't exhaust the wall clock, so the match can't be forced unrated
+
+
+def test_house_lobby_seat_is_mock_unrated_and_needs_no_connection_token(monkeypatch):
+    seen = {}
+
+    def capture(cfg, **kwargs):
+        seen.update(cfg=cfg, meta=kwargs["meta"])
+        return "mid"
+
+    monkeypatch.setattr(rt, "start_match", capture)
+    profile = build_profiles(1)[0]
+    house = rt.lobby.register(profile.name, profile.model, house=True, house_config=profile.to_config())
+    human = rt.lobby.register("Human", "self-hosted")
+
+    match_id, tokens = rt._lobby_start("quiz", [human, house], ranked=True)
+
+    assert match_id == "mid" and set(tokens) == {human.id}
+    assert seen["meta"]["ranked"] is False
+    specs = {spec.id: spec for spec in seen["cfg"].agents}
+    assert specs[profile.name].adapter == "mock"
+    assert specs[profile.name].model.startswith("House Logic ")
+    assert specs[profile.name].system_prompt == profile.prompt
+    assert specs[profile.name].params["answers"]
+    assert specs["Human"].adapter == "remote"
+    assert seen["cfg"].ratings_path == ""
+
+
+def test_house_match_summary_reports_healthy_result_as_unrated():
+    class Done:
+        def done(self):
+            return True
+
+        def cancelled(self):
+            return False
+
+        def exception(self):
+            return None
+
+        def result(self):
+            return type("Report", (), {
+                "status": "COMPLETE", "result": None, "rated": True, "forfeits": [],
+            })()
+
+    mid = "20990101-000000-abcdef"
+    rt.matches[mid] = {
+        "task": Done(), "mode": "quiz", "players": ["[House] A", "[House] B"],
+        "started": 0.0, "source": "house", "ranked": False,
+    }
+    try:
+        assert rt.match_summary(mid)["rated"] is False
+    finally:
+        rt.matches.pop(mid, None)
 
 
 def test_public_ctf_lobby_uses_the_fixed_safe_target(monkeypatch):

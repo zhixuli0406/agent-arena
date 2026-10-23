@@ -35,12 +35,13 @@ def test_live_player_count_stays_visible_on_narrow_screens():
     assert 'id="onlinePill"' in html and 'aria-live="polite"' in html
     assert 'id="onlineDot"' in html and 'class="online-label"' in html
     assert 'href="css/lobby.css?v=20261024.1"' in html
-    assert 'src="js/i18n.js?v=20261024.3"' in html
+    assert 'src="js/i18n.js?v=20261024.4"' in html
     assert 'src="js/agent.js?v=20261024.3"' in html
-    assert 'src="js/lobby.js?v=20261024.1"' in html
+    assert 'src="js/lobby.js?v=20261024.2"' in html
     assert 'value !== null && Number.isFinite(n)' in js
     assert 'const next = ok ? fmtNum(count) : "–"' in js
     assert 'if ($("stOnline").textContent !== next)' in js
+    assert 't("st_house"' in js and 'S.stats.house_agents' in js
     assert '.online-pill .online-label{display:none}' in css
     assert '.pill.opt,.me .sub' not in css
 
