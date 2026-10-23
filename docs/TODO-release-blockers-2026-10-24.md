@@ -1,8 +1,8 @@
 # 2026-10-24 接入流程與 House 對手發布追蹤
 
-更新時間：2026-10-24 03:15 Asia/Taipei
+更新時間：2026-10-24 03:23 Asia/Taipei
 
-專案／分支／基線：`agent-arena`／`main`／接入修正 `3141ab5`、House 功能 `6ccad51`；最新部署機器人提交 `f98365d`
+專案／分支／基線：`agent-arena`／`main`／接入修正 `3141ab5`、House 功能 `6ccad51`、等待統計修正 `236488e`；最新部署機器人提交 `bcdbced`
 
 此次範圍：修正重複玩家接入流程、建立 CI、加入透明的常駐 House 對手與展示局、重新部署公開後端與 GitHub Pages、公開站點驗收。
 
@@ -39,9 +39,10 @@
 | E8 | L1-L2／R5 | House 測試先紅後綠；全量 `.venv/bin/pytest -q`：249 passed、1 warning；compile、全 JS syntax、whitespace 通過 | PASS |
 | E9 | L2／R5 | GitHub Actions CI `40009292984`：commit `6ccad51`，compile、tests、browser scripts、whitespace 全通過 | PASS |
 | E10 | L3／R5 | 本機正式 lifespan：`house_agents=4`，quiz/task 各 2 位待命；3 場 House 展示局皆 `COMPLETE`、`rated=false` | PASS |
-| E11 | L4／R5 | 後端 run `40009443963`：prepare 與 isolation success；Tunnel `tuning-identifier-earrings-descending.trycloudflare.com` healthy | PASS |
+| E11 | L4／R5 | 最終後端 run `40010387282`：prepare 與 isolation success；Tunnel `highlighted-newton-century-enters.trycloudflare.com` healthy | PASS |
 | E12 | L4／R6 | 公開暫存玩家 `House E2E Check` 約 5 秒配到 `[House] Aster`，5 題完成；對局 `20261023-191411-a160d3` 為 `COMPLETE`、`rated=false`，玩家仍 1500 分／0 計分場 | PASS |
 | E13 | L3-L4／R6 | Pages `40009667695` 成功；公開 `server.json` 指向新 Tunnel；Chrome 頁首分列真人與 `House 4`，觀戰列出真人對 House 與 3 場 House 展示局 | PASS |
+| E14 | L1-L4／R5 | 排除 House 長駐時間對 `avg_wait` 的污染：回歸與全量 249 tests 通過、CI `40010292659` 成功；公開玩家 `Wait Metric Check` 約 5 秒配到 House，結束後 `avg_wait=6.4` 而非舊版 33.9 | PASS |
 
 ## 發布判定
 
