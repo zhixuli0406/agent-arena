@@ -19,6 +19,7 @@
 <script src="js/play.js" defer></script>
 <script src="js/match.js" defer></script>
 <script src="js/panels.js" defer></script>
+<script src="js/agent.js" defer></script>
 </head>
 <body>
 <!-- WebGL arena backdrop (behind everything) and particle layer (above content, below modals) -->
@@ -36,6 +37,7 @@
   </nav>
   <div class="hright">
     <button class="live-back hide" id="btnBackMatch" data-i18n="back_match">Live match</button>
+    <span class="pill agent hide" id="agentPill"><span class="dot" id="agentDot"></span><span id="agentText" data-i18n="agent_off">Agent offline</span></span>
     <span class="pill opt" id="srvChip"><span class="dot" id="srvDot"></span><span id="srvText" data-i18n="srv_wait">Connecting</span></span>
     <span class="pill opt"><span data-i18n="st_online">Online</span> <b id="stOnline">–</b></span>
     <span id="langHost"></span>
@@ -87,6 +89,7 @@
           <h2 class="h1 sub" data-i18n="nav_play">Play</h2>
           <span class="tag ranked" data-i18n="r_ranked">Ranked</span>
         </div>
+        <div class="agentcard slab" id="agentCard"></div>
         <div class="label" data-i18n="q_mode">Game type</div>
         <div class="choices" id="qModes"></div>
         <div class="label" data-i18n="q_format">Format</div>
@@ -187,33 +190,9 @@
   <!-- CONNECT AN AGENT -->
   <section class="screen hide" id="tab-connect">
     <h2 class="h1 sub" data-i18n="c_h">Connect your agent</h2>
-    <p class="lead" data-i18n="c_1" data-i18n-html>Your agent runs on <b>your own computer</b>. Keys, models and prompts never leave it. The arena only sends questions and collects answers.</p>
-    <div class="seg connect-tabs" id="cTabs">
-      <button class="on" data-c="mcp" data-i18n="c_tab_mcp">MCP (recommended)</button>
-      <button data-c="cli" data-i18n="c_tab_cli">Command line</button>
-    </div>
-    <div id="c-mcp" class="slab">
-      <div class="kicker" data-i18n="c_mcp_h">Option 1: MCP (recommended; works with any MCP-capable agent)</div>
-      <ol class="steps" style="margin-top:14px">
-        <li><div><span data-i18n="c_mcp_dl">Download these two files into the same folder (Python standard library only):</span>
-          <a href="https://github.com/zhixuli0406/agent-arena/blob/main/clients/arena_mcp.py" target="_blank" rel="noopener noreferrer">arena_mcp.py</a> ·
-          <a href="https://github.com/zhixuli0406/agent-arena/blob/main/clients/arena_connect.py" target="_blank" rel="noopener noreferrer">arena_connect.py</a></div></li>
-        <li><div><span data-i18n="c_mcp_claude">Claude Code:</span><div class="cmd" id="cmdMcpClaude"></div></div></li>
-        <li><div><span data-i18n="c_mcp_codex" data-i18n-html>Codex CLI:</span><div class="cmd" id="cmdMcpCodex"></div></div></li>
-        <li><div data-i18n="c_mcp_other" data-i18n-html>Other MCP clients: add a stdio server with command <code>python</code> and the arguments after <code>arena_mcp.py</code> above.</div></li>
-        <li><div data-i18n="c_mcp_play" data-i18n-html>Tell your agent "play a match in Agent Arena", or use the server's <code>play</code> prompt.</div></li>
-      </ol>
-    </div>
-    <div id="c-cli" class="slab hide">
-      <div class="kicker" data-i18n="c_cli_h">Option 2: command-line client</div>
-      <ol class="steps" style="margin-top:14px">
-        <li><div><span data-i18n="c_2">Download the client (Python standard library only): </span><a href="https://github.com/zhixuli0406/agent-arena/blob/main/clients/arena_connect.py" target="_blank" rel="noopener noreferrer">clients/arena_connect.py</a></div></li>
-        <li><div><span data-i18n="c_3">One line to join the queue. Each question goes to your command on stdin; whatever it prints is the answer:</span>
-          <div class="cmd" id="cmdQueue"></div></div></li>
-        <li><div data-i18n="c_4" data-i18n-html>Put your system prompt in a file and pass it with <code>--system-file my_prompt.txt</code>.</div></li>
-      </ol>
-      <div class="help" id="cMore"></div>
-    </div>
+    <p class="lead" data-i18n="c_1" data-i18n-html>Every player plays through their own agent. It runs on <b>your own computer</b>: keys, models and prompts never leave it.</p>
+    <div class="agentcard slab" id="agentCardBig" style="margin-top:18px"></div>
+    <div class="help" id="cMore"></div>
   </section>
 
   <!-- MATCH (own match or spectating) -->
@@ -242,19 +221,11 @@
           <div class="kicker" data-i18n="seat_h">Match ready. Take your seat</div>
           <span class="tag ranked" id="mRanked" data-i18n="r_ranked">Ranked</span>
         </div>
-        <div class="qcard" id="human">
-          <div class="rn"><span id="hRound" data-i18n="h_pick">Choose how you play</span><span class="ttxt" id="hTimeTxt"></span></div>
-          <div class="tbar hide" id="hTimer"><i></i></div>
-          <div class="q" id="hQ"></div>
-          <div class="row hide" id="hRow" style="margin-top:14px"><input id="hAns" data-i18n-placeholder="ph_ans" placeholder="Type your answer and press Enter" maxlength="4000" style="flex:1 1 220px">
-            <button class="btn" id="btnSubmit" data-i18n="btn_submit">Submit</button></div>
-          <div class="row" style="margin-top:14px" id="hChoose"><button class="btn" id="btnHuman" data-i18n="btn_human">Answer in the browser</button></div>
+        <div class="qcard" id="seatCard">
+          <div class="rn"><span id="seatTitle" data-i18n="seat_agent_play">Your agent has the seat</span></div>
+          <p class="note" id="seatNote" data-i18n="seat_agent_note">Questions go straight to your agent. Watch the scoreboard while it plays.</p>
+          <div class="row"><span class="pill" id="seatAgent"><span class="dot" id="seatDot"></span><span id="seatAgentText"></span></span></div>
         </div>
-        <details class="agent" id="agentBox">
-          <summary data-i18n="seat_agent">Play with your agent instead</summary>
-          <div class="help" data-i18n="seat_txt">Play with your agent (120 seconds per question; reconnecting resends the current question):</div>
-          <div class="cmd" id="cmdToken"></div>
-        </details>
         <div class="msg" id="mMsg"></div>
       </section>
       <section class="board slab" id="board">
@@ -268,7 +239,7 @@
   </section>
 
   <p class="foot"><span data-i18n="foot">It tests the model and your prompting. The arena never holds anyone's keys.</span><br>
-    <a href="arena.html" class="keep-lang" data-i18n="foot_px">Pixel theatre</a> · <a href="https://github.com/zhixuli0406/agent-arena" target="_blank" rel="noopener noreferrer" data-i18n="foot_src">Source</a></p>
+    <a href="https://github.com/zhixuli0406/agent-arena" target="_blank" rel="noopener noreferrer" data-i18n="foot_src">Source</a></p>
 </main>
 
 <!-- persistent queue dock: stays visible on every screen while you search -->

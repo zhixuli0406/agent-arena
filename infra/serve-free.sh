@@ -43,9 +43,8 @@ Match server is live (free, no credit card, no account):
   Public URL   $URL
   Health       $URL/api/health
   Lobby        $URL/game/index.html
-  Pixel arena  $URL/game/arena.html
   Join         python -m clients.arena_connect --server $URL --name your-name --cmd "your agent command"
-  Watch live   $URL/game/arena.html?match=<id>&api=$URL
+  Watch live   $URL/game/index.html?match=<id>&api=$URL
 
 Ctrl-C stops everything and tears it down.
 EOF

@@ -50,7 +50,7 @@ Run one quiz match end to end on the local machine.
 ## M4: match server and pixel game front end
 
 - [x] FastAPI match server `server/app.py`: start matches, live SSE transcript streaming, results, serves the front end ✅ run and verified locally
-- [~] Pixel game front end `web/arena.html`: plays a match out as an 8-bit retro battle (fork in progress; affected by rate limiting, status to be confirmed)
+- [x] ~~Pixel game front end `web/arena.html`~~: removed; spectating lives in the lobby (Spectate tab, `?match=<id>` links).
 - [ ] Prompt submission UI (operators upload a strategy prompt)
 - **DoD**: watch a match live in the browser, with pixel animation and both rating axes; no layout breakage.
 

@@ -47,6 +47,7 @@ function renderQuick() {
 function renderQueueButton() {
   const b = $("btnQueue"), left = Math.ceil((cooldownUntil - Date.now()) / 1000);
   if (left > 0) { b.disabled = true; b.textContent = t("btn_cooldown", { t: mmss(left) }); return; }
+  if (S.pid && !S.agentOnline) { b.disabled = true; b.textContent = t("btn_need_agent"); return; }   // own agent required
   if (isFollower()) { b.disabled = true; b.textContent = t("btn_wait_leader"); return; }
   b.disabled = !!(S.ticket && ["searching", "ready_check"].includes(S.ticket.status));
   b.textContent = t("btn_queue");
@@ -189,7 +190,7 @@ function renderTicket(v) {
   if (ready && v.ready) { renderReady(v.ready, prev !== "ready_check"); } else { $("readyVeil").classList.add("hide"); L.stopFlash(); }
   if (v.status === "confirmed") {
     stopTicket();
-    L.seat(v.token, v.match_id, (S.lastPlayers || []).map(p => ({ id: p.name, sub: p.agent, side: p.side })), v.ranked !== false);
+    L.seat(v.match_id, (S.lastPlayers || []).map(p => ({ id: p.name, sub: p.agent, side: p.side })), v.ranked !== false);
   }
   if (v.status === "declined") { stopTicket(); toast(tk("q_declined", { n: v.cooldown }), "err"); startCooldown(v.cooldown); }
   if (v.status === "cancelled") { stopTicket(); toast(tk("q_cancelled")); }
@@ -231,6 +232,7 @@ function renderReady(r, first) {
 
 /* ---------- hooks ---------- */
 L.hooks.init.push(renderQuick);
+L.hooks.agent.push(renderQueueButton);
 L.hooks.lang.push(() => {
   renderQuick();
   if (S.party) renderParty(S.party);

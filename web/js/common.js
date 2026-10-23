@@ -1,4 +1,4 @@
-/* Shared helpers for index.html and arena.html (no DOM-specific logic). */
+/* Shared helpers for the lobby page (no DOM-specific logic). */
 (function () {
 "use strict";
 const { t } = window.I18N;

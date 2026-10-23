@@ -314,6 +314,7 @@ details.agent summary{cursor:pointer;font-weight:700}
 @media (max-width:1020px){
   .play,.match{grid-template-columns:1fr}
   .rail{order:-1}
+  .play:has(#agentCard:not(.on):not(.hide)) .rail{order:0}   /* connecting your agent comes first */
   .onboard{grid-template-columns:1fr}
 }
 @media (max-width:760px){
@@ -342,3 +343,22 @@ details.agent summary{cursor:pointer;font-weight:700}
   .toast{max-width:none}
   .roomcode{font-size:40px}
 }
+
+/* ---------- agent link (players must bring their own agent) ---------- */
+.agentcard{margin:18px 0 6px;border-left:4px solid var(--signal)}
+.agentcard.on{border-left-color:var(--good)}
+.agentcard .aghead{display:flex;align-items:center;gap:10px}
+.agentcard .aghead .dot{width:12px;height:12px}
+.agentcard > .note{margin:6px 0 0}
+.agentcard .codebox{margin-top:14px;gap:12px}
+.agentcard .codebox b{font-size:30px;letter-spacing:.22em;margin-right:0}
+.agentcard .codebox .k{width:auto}
+.agentcard .steps{margin-top:14px}
+.agentcard .waiting{margin-top:12px;color:var(--warn);font-weight:700}
+.agentcard.on .waiting{display:none}
+.agentcard .reset{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.pill.agent{font-weight:700}
+.pill.agent .dot.off{background:var(--warn)}
+#seatCard.warn{border-top-color:var(--bad)}
+#seatCard .note{margin:8px 0 12px}
+@media (max-width:1020px){ .pill.agent span:not(.dot){display:none} .pill.agent{padding:0 10px} }

@@ -45,11 +45,26 @@ function tierEl(rating, games) {
 }
 
 /* ---------- state ---------- */
-const S = { server: "", manualServer: "", pid: "", secret: "", me: null, srv: "wait", codeLen: 7, stats: null,
+const S = { server: "", manualServer: "", pid: "", secret: "", me: null, srv: "wait", codeLen: 7, stats: null, agentOnline: false,
   ticket: null, party: null, room: null, roomView: null, mode: "quiz", size: 2, fmt: "ffa", token: null, match: null };
+// Credentials are kept per server: a link that points this page at some other server (?api=) never sends it,
+// or lets it wipe, the account you have on the public lobby. The public lobby rotates URLs, so it is one key.
+const credKey = () => (autoServer ? "public" : base());
 const store = {
-  load() { try { return JSON.parse(localStorage.getItem("arena.v2") || "{}") || {}; } catch (_) { return {}; } },
-  save() { try { localStorage.setItem("arena.v2", JSON.stringify({ server: S.manualServer, pid: S.pid, secret: S.secret })); } catch (_) { /* storage blocked */ } },
+  load() {
+    let v = null; try { v = JSON.parse(localStorage.getItem("arena.v3") || "null"); } catch (_) { /* fresh */ }
+    if (v && typeof v === "object" && v.creds && typeof v.creds === "object") return v;
+    let old = {}; try { old = JSON.parse(localStorage.getItem("arena.v2") || "{}") || {}; } catch (_) { /* none */ }
+    const creds = {};                                          // migrate the single v2 credential
+    if (old.pid && old.secret) creds[old.server ? safeApi(old.server) || "public" : "public"] = { pid: old.pid, secret: old.secret };
+    return { server: old.server || "", creds };
+  },
+  creds() { const c = store.load().creds[credKey()]; return c && c.pid && c.secret ? c : { pid: "", secret: "" }; },
+  save() {
+    const v = store.load(); v.server = S.manualServer;
+    if (S.pid) v.creds[credKey()] = { pid: S.pid, secret: S.secret }; else delete v.creds[credKey()];
+    try { localStorage.setItem("arena.v3", JSON.stringify(v)); localStorage.removeItem("arena.v2"); } catch (_) { /* storage blocked */ }
+  },
 };
 const prefs = Object.assign({ sound: true, fx: true, cb: false }, (() => { try { return JSON.parse(localStorage.getItem("arena.prefs") || "{}"); } catch (_) { return {}; } })());
 const savePrefs = () => { try { localStorage.setItem("arena.prefs", JSON.stringify(prefs)); } catch (_) { /* storage blocked */ } };
@@ -83,6 +98,7 @@ function say(id, msg, err) {
   e.textContent = msg && typeof msg === "object" ? t(msg.key, msg.params) : (msg || "");
   e.classList.toggle("err", !!err);
 }
+function fillCmd(id, get) { $(id).replaceChildren(document.createTextNode(get()), copyBtn(get)); }
 function copyBtn(get, okKey) {
   const b = node("button", "btn sec sm", t("btn_copy")); b.type = "button";
   b.addEventListener("click", () => copy(get(), okKey)); return b;
@@ -179,18 +195,35 @@ function needPlayer(msgId) {
   if (msgId !== "enterMsg") toast(tk("e_need"), "err");
   $("inName").focus(); return false;
 }
+function setAgent(on, force) {
+  const changed = force || S.agentOnline !== !!on;
+  S.agentOnline = !!on;
+  $("agentPill").classList.toggle("hide", !S.pid);
+  $("agentDot").className = "dot " + (S.agentOnline ? "on" : "off");
+  $("agentText").textContent = t(S.agentOnline ? "agent_on" : "agent_off");
+  $("agentPill").title = $("agentText").textContent;               // the text is hidden on narrow screens
+  if (changed) L.hooks.agent.forEach(f => f(S.agentOnline));
+}
 async function refreshMe() {
   const m = await api("GET", "/api/lobby/me");
   showMe(m.player);
+  setAgent(m.agent_online, true);
   L.hooks.refresh.forEach(f => f(m));
   return m;
 }
+// Every player plays through their own agent: keep its online state fresh (it gates queueing and readying up)
+let mePause = 0;
+setInterval(async () => {
+  if (!S.pid || Date.now() < mePause) return;
+  try { const m = await api("GET", "/api/lobby/me"); showMe(m.player); setAgent(m.agent_online); }
+  catch (e) { if (e.status === 429) mePause = Date.now() + e.retryAfter * 1000; }
+}, 4000);
 $("btnEnter").addEventListener("click", async () => {
   const name = $("inName").value.trim(); if (!name) { say("enterMsg", tk("e_noname"), 1); return; }
   say("enterMsg", tk("e_entering"));
   try {
     const r = await api("POST", "/api/lobby/players", { name, agent: $("inAgent").value.trim() });
-    S.pid = r.player.id; S.secret = r.secret; store.save(); showMe(r.player); say("enterMsg", ""); openTab("quick");
+    S.pid = r.player.id; S.secret = r.secret; store.save(); showMe(r.player); setAgent(false, true); say("enterMsg", ""); openTab("quick");
     L.hooks.entered.forEach(f => f());
   } catch (e) { say("enterMsg", tk("e_enterfail", { e: e.message }), 1); }
 });
@@ -198,7 +231,9 @@ $("inName").addEventListener("keydown", e => { if (e.key === "Enter") $("btnEnte
 $("btnServer").addEventListener("click", async () => {
   const v = safeApi($("inServer").value.trim());
   if (v === null) { say("enterMsg", tk("e_bad_url"), 1); return; }
-  S.server = S.manualServer = v; store.save();
+  const before = credKey();
+  S.server = S.manualServer = v; autoServer = false; store.save();
+  if (credKey() !== before) { location.reload(); return; }     // another server: its own sign-in
   const ok = await health();
   say("enterMsg", ok ? tk("e_srv_ok") : tk("e_srv_bad"), !ok);
   L.hooks.lang.forEach(f => f());
@@ -249,7 +284,7 @@ for (const [id, key] of [["setSound", "sound"], ["setFx", "fx"], ["setCb", "cb"]
 
 /* ---------- language switch: re-render everything that holds translated text ---------- */
 document.addEventListener("arena:lang", () => {
-  setSrv(S.srv);
+  setSrv(S.srv); if (S.pid) setAgent(S.agentOnline);
   for (const id in sayState) if (sayState[id]) say(id, sayState[id].msg, sayState[id].err);
   if (toastState && typeof toastState.msg === "object") toast(toastState.msg, toastState.kind);
   if (S.me) showMe(S.me);
@@ -259,10 +294,10 @@ document.addEventListener("arena:lang", () => {
 /* ---------- shared namespace ---------- */
 const L = window.LOBBY = {
   S, t, th, fmtNum, $, node, ava, color, emptyNote, mmss, modeName, statusLabel, badgeClass, fmtPts, tierOf, tierEl,
-  api, base, enc, tk, say, toast, copy, copyBtn, beep, flashTitle, stopFlash, needPlayer, refreshMe, openTab, showMatchView,
+  api, base, enc, tk, say, toast, copy, copyBtn, fillCmd, beep, flashTitle, stopFlash, needPlayer, refreshMe, setAgent, openTab, showMatchView,
   isMatchView: () => inMatchView, currentTab: () => currentTab, prefs,
   matchLive: () => false,                    // match.js replaces this
-  hooks: { init: [], lang: [], me: [], refresh: [], tab: [], entered: [] },
+  hooks: { init: [], lang: [], me: [], refresh: [], tab: [], entered: [], agent: [] },
 };
 
 /* ---------- boot (after every deferred module has registered its hooks) ---------- */
@@ -271,8 +306,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.I18N.apply();
   applyPrefs();
   L.hooks.init.forEach(f => f());
-  const saved = store.load(); S.pid = saved.pid || ""; S.secret = saved.secret || "";
   await discover();
+  ({ pid: S.pid, secret: S.secret } = store.creds());
   $("inServer").value = S.manualServer || (S.server && S.server !== location.origin ? S.server : "");
   L.hooks.lang.forEach(f => f());
   try {
@@ -282,8 +317,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (_) { /* keep default length */ }
   await health(); stats(); setInterval(stats, 5000);
   if (S.pid) { try { await refreshMe(); } catch (e) { if (e.status === 401) { S.pid = S.secret = ""; store.save(); } } }
+  const login = qs("login");
+  // Signing in through a link replaces the account in this browser, so ask first if one is already signed in
+  if (login && /^[A-Za-z0-9]{6,12}$/.test(login) && (!S.pid || window.confirm(t("login_switch", { n: (S.me && S.me.name) || "?" })))) {
+    try {
+      const r = await api("POST", "/api/lobby/link/redeem", { code: login });
+      S.pid = r.player.id; S.secret = r.secret; store.save(); toast(tk("login_ok", { n: r.player.name }), "ok");
+      await refreshMe();
+    } catch (_) { toast(tk("login_bad"), "err"); }
+  }
+  if (login) { try { const u = new URL(location.href); u.searchParams.delete("login"); history.replaceState(history.state, "", u); } catch (_) { /* ignore */ } }
   if (!S.pid) $("enter").classList.remove("hide");
   if (!L.isMatchView()) openTab(S.pid ? "quick" : (qs("party") || qs("room") ? "quick" : "watch"));
   L.hooks.entered.forEach(f => f());
+  const watchId = qs("match");
+  if (watchId && window.ARENA.MATCH_RE.test(watchId) && L.watch) L.watch(watchId, []);
 });
 })();

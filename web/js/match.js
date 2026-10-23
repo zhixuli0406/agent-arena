@@ -1,96 +1,33 @@
-/* Match view: seat (agent command or answer in the browser), per-question timer, live scoreboard,
- * team versus bar, and the post-match screen (victory/defeat/draw, rating change, play again). */
+/* Match view: your agent plays the seat (it gets the token over its standby stream, never the page),
+ * live scoreboard, team versus bar, and the post-match screen (victory/defeat/draw, rating change, play again). */
 (function () {
 "use strict";
 const L = window.LOBBY;
-const { S, t, th, fmtNum, $, node, ava, modeName, statusLabel, badgeClass, fmtPts, api, base, enc, tk, say } = L;
-const { MATCH_RE, sq } = window.ARENA;
-const STEP_SECONDS = 120;          // server-side limit per question
+const { S, t, th, fmtNum, $, node, ava, modeName, statusLabel, badgeClass, fmtPts, base, enc } = L;
+const { MATCH_RE } = window.ARENA;
 let live = false;                  // my own match is still running
-
-/* ---------- agent commands (also used by the connect panel) ---------- */
-function clientCmd(args) {
-  return ["python", "arena_connect.py", "--server", sq(base()), ...args, "--lang", window.I18N.lang(), "--cmd", sq("claude -p")].join(" ");
-}
-L.clientCmd = clientCmd;
-const tokenCmd = () => clientCmd(["--token", sq(S.token)]);
-L.fillCmd = (id, get) => { $(id).replaceChildren(document.createTextNode(get()), L.copyBtn(get)); };
 
 /* ---------- seat ---------- */
 function setRanked(ranked) {
   S.seatRanked = ranked;
   const e = $("mRanked"); e.className = "tag " + (ranked ? "ranked" : "unranked"); e.textContent = t(ranked ? "r_ranked" : "r_unranked");
 }
-L.seat = (token, match, players, ranked) => {
-  S.token = token; S.match = match; live = true;
+function renderSeatAgent() {
+  const on = !!S.agentOnline;
+  $("seatDot").className = "dot " + (on ? "on" : "off");
+  $("seatAgentText").textContent = t(on ? "seat_on" : "seat_off");
+  $("seatCard").classList.toggle("warn", !on);
+}
+L.seat = (match, players, ranked) => {
+  S.match = match; live = true;
   S.ratingBefore = S.me ? Number(S.me.rating) : null;
   $("matchPanel").classList.remove("hide"); $("result").classList.add("hide"); $("resDelta").classList.add("hide");
-  resetHuman();
   setRanked(ranked !== false);
-  L.fillCmd("cmdToken", tokenCmd);
+  renderSeatAgent();
   watch(match, players, true);
   L.showMatchView();
 };
 L.matchLive = () => live && !!S.match;
-
-/* ---------- answering in the browser ---------- */
-let hES = null, answered = new Set(), curRound = null, hOver = false, hPhase = "pick", qAt = 0, qTimer = 0;
-function resetHuman() {
-  if (hES) { hES.close(); hES = null; }
-  answered = new Set(); curRound = null; hOver = false; hPhase = "pick"; stopTimer();
-  $("hRound").textContent = t("h_pick"); $("hQ").textContent = ""; $("hRow").classList.add("hide");
-  $("hChoose").classList.remove("hide"); $("agentBox").open = false;
-}
-function startTimer() {
-  stopTimer(); qAt = performance.now(); $("hTimer").classList.remove("hide");
-  const tickT = () => {
-    const left = Math.max(0, STEP_SECONDS - (performance.now() - qAt) / 1000);
-    const low = left <= 15;
-    $("hTimer").querySelector("i").style.transform = `scaleX(${left / STEP_SECONDS})`;
-    $("hTimer").classList.toggle("low", low);
-    $("hTimeTxt").textContent = t("h_time", { s: Math.ceil(left) }); $("hTimeTxt").classList.toggle("low", low);
-  };
-  tickT(); qTimer = setInterval(tickT, 1000);
-}
-function stopTimer() { clearInterval(qTimer); $("hTimer").classList.add("hide"); $("hTimeTxt").textContent = ""; }
-function openHumanStream() {
-  if (hES) hES.close();
-  hES = new EventSource(`${base()}/api/connect/${enc(S.token)}/stream?lang=${enc(window.I18N.lang())}`);
-  hES.onmessage = e => {
-    let o; try { o = JSON.parse(e.data); } catch (_) { return; }
-    if (!o || answered.has(o.round)) return;
-    curRound = o.round; hPhase = "q";
-    $("hRound").textContent = t("h_round", { n: o.round });
-    $("hQ").textContent = (o.instructions ? o.instructions + "\n\n" : "") + (o.task || "");
-    $("hRow").classList.remove("hide"); $("hAns").value = ""; $("hAns").focus();
-    startTimer();
-  };
-  hES.addEventListener("end", () => {
-    hOver = true; hPhase = "end"; hES.close(); hES = null; stopTimer();
-    $("hRound").textContent = t("h_end"); $("hQ").textContent = t("h_end2"); $("hRow").classList.add("hide");
-  });
-  hES.onerror = () => { if (!hOver) say("mMsg", tk("h_unstable")); };
-}
-$("btnHuman").addEventListener("click", () => {
-  if (!S.token) return;
-  answered = new Set(); hOver = false; hPhase = "wait";
-  $("hChoose").classList.add("hide"); $("hRow").classList.remove("hide");
-  $("hRound").textContent = t("h_wait"); $("hQ").textContent = "";
-  openHumanStream();
-});
-async function submit() {
-  const r = curRound; if (r == null || answered.has(r)) return; const a = $("hAns").value.trim();
-  answered.add(r);   // lock this round first: the next question may arrive before the response does
-  try {
-    await api("POST", `/api/connect/${enc(S.token)}/action`, { round: r, content: a });
-    if (curRound === r && !hOver) { hPhase = "sent"; stopTimer(); $("hRound").textContent = t("h_sent", { n: r }); $("hRow").classList.add("hide"); }
-  } catch (e) {
-    if (e.status !== 410) answered.delete(r);   // 410: match already over, keep it locked
-    say("mMsg", e.message, 1);
-  }
-}
-$("btnSubmit").addEventListener("click", submit);
-$("hAns").addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
 
 /* ---------- scoreboard ---------- */
 let bES = null, B = {}, bMatch = null, bMode = null, bResult = null, bTeams = null, myId = null, mySide = null, own = false, celebrated = false;
@@ -255,7 +192,7 @@ function renderDelta(me) {
 $("btnAgain").addEventListener("click", () => { leaveMatch(); L.requeue(); });
 $("btnLobby").addEventListener("click", () => { leaveMatch(); L.openTab(S.pid ? "quick" : "watch"); });
 function leaveMatch() {
-  S.token = S.match = null; live = false; resetHuman();
+  S.match = null; live = false;
   if (bES) { bES.close(); bES = null; }
   $("matchPanel").classList.add("hide"); $("result").classList.add("hide"); $("resDelta").classList.add("hide");
   document.querySelector(".match").classList.remove("spectate");
@@ -264,14 +201,10 @@ function leaveMatch() {
 
 /* ---------- hooks ---------- */
 L.hooks.lang.push(() => {
-  if (S.token) L.fillCmd("cmdToken", tokenCmd);
   if (S.seatRanked != null) setRanked(S.seatRanked);
+  if (S.match) renderSeatAgent();
   const bs = $("bStatus"); if (bs.dataset.s) setBadge(bs.dataset.s);
   renderMeta(); renderWin(); if (bResult) renderResult();
-  if (hPhase === "pick") $("hRound").textContent = t("h_pick");
-  else if (hPhase === "wait") $("hRound").textContent = t("h_wait");
-  else if (hPhase === "sent" && curRound != null) $("hRound").textContent = t("h_sent", { n: curRound });
-  else if (hPhase === "end") { $("hRound").textContent = t("h_end"); $("hQ").textContent = t("h_end2"); }
-  if (hES && !hOver && S.token) openHumanStream();   // re-subscribe so questions come in the new language
 });
+L.hooks.agent.push(() => { if (S.match) renderSeatAgent(); });
 })();

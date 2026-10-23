@@ -89,9 +89,8 @@ cat <<EOF
 $HEAD
   URL          $URL
   Lobby        $URL/game/index.html
-  Pixel arena  $URL/game/arena.html
   Match ID     ${MID:-(failed to start, see above)}
-  Watch live   $URL/game/arena.html?match=$MID&api=$URL
+  Watch live   $URL/game/index.html?match=$MID&api=$URL
 
 Ctrl-C stops everything and tears it down.
 EOF

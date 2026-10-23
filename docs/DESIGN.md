@@ -109,7 +109,17 @@ Each match writes one `Transcript` (JSON Lines), one line per event (observation
 
 The earliest version had the server play on behalf of each vendor (`claude_cli`, `codex_cli`, `grok_cli` ran on the server's machine). In public this has two fundamental problems: every match spends the server owner's quota and keys, and only the vendors the server can afford to install get to play.
 
-Once players bring their own agents, the server does three things: matchmaking, questions, grading. The player's agent runs on the player's own computer and uses a connection token to receive questions and send answers. The server holds zero keys, and anything that can read and write text can take part (vendor APIs, local models, products with no public API relayed by the player, humans). It also turns "humans writing prompts" into the actual contest between players. Public servers therefore allow only the `remote` and `mock` adapters; `ARENA_ALLOW_HOST_ADAPTERS=1` is only for private self-hosted servers.
+Once players bring their own agents, the server does three things: matchmaking, questions, grading. The player's agent runs on the player's own computer and uses a connection token to receive questions and send answers. The server holds zero keys, and anything that can read and write text can take part (vendor APIs, local models, products with no public API relayed by the player). It also turns "humans writing prompts" into the actual contest between players. Public servers therefore allow only the `remote` and `mock` adapters; `ARENA_ALLOW_HOST_ADAPTERS=1` is only for private self-hosted servers.
+
+### Agents are required; the website only operates
+
+Early lobby builds let a human answer in the browser and had a separate pixel-art "theater" page for replays. Both went away. A human typing answers measures nothing the game is about, and a browser seat made it easy to queue with no agent at all and leave the opponent waiting on a timeout. Now every seat is played by the player's own agent, and the website is a remote control: it queues, forms parties, accepts, spectates.
+
+That is enforced on the server, not in the page. Each agent keeps one standby stream open (`GET /api/lobby/agent/stream`). The stream is the presence signal (queueing, accepting and readying up are refused while it's closed, with a 20 s grace for reconnects), and it is the only channel that ever carries a seat's connection token. Ticket and room views stopped returning tokens, so the browser can't take a seat even if someone edits the page.
+
+To get the agent onto the same player as the browser without copying a secret around, the browser asks for a one-time link code (8 characters, 10 minutes). Redeeming it mints a **separate** credential for that player, so the browser and the agent never hold each other's secret, and either can be revoked. "Sign out all agents and other browsers" keeps only the caller's credential and immediately takes the others offline (no grace period). A client whose saved credential stops working exits with an explanation instead of quietly registering a new player; otherwise the website would keep queueing one player while the agent played as another.
+
+Two things came out of the security review of this flow. The browser keeps credentials per server, so a link that points the page at another server (`?api=`) never sends it your lobby account. The clients only treat a server as "the public lobby" (shared saved identity) when `server.json` actually points to it, since anyone can open a `*.trycloudflare.com` tunnel. Link codes from the server are checked against `[A-Z0-9]` before they go into copy-paste shell commands or printed URLs.
 
 ### Connecting agents over MCP
 

@@ -8,6 +8,11 @@ All notable changes to this project are recorded in this file. The format follow
 
 Everything in this section changes behavior that API callers or self-hosters could rely on (breaking).
 
+- **Players must bring their own agent.** Queueing, accepting a ready check and readying up in a room return 409 `agent_offline` (naming who) unless the player's agent is online, and in a party every member's agent; starting a room needs every member's. "Online" means the agent holds the new standby stream `GET /api/lobby/agent/stream`, with a 20-second grace after it drops.
+- **Seat tokens only go to the agent.** Ticket and room views (`/api/lobby/tickets/{id}`, `/api/lobby/rooms/{code}`, `/api/lobby/me`) no longer contain `token`; the token arrives as an `event: match` on the standby stream. Clients that read the token from the ticket must switch to the stream.
+- The website no longer has a seat of its own: it queues, accepts and spectates, and the player's agent plays. The command-line client's `--interactive` option is gone.
+- Clients keep the shared "public" saved identity only for a server that `server.json` points to; any other `*.trycloudflare.com` URL gets its own entry. A client whose saved credential is rejected (401 `auth_failed`, e.g. signed out from the website) now stops with an explanation instead of registering a new player; a forgotten guest (new 401 code `player_unknown`) still registers again.
+- The website stores credentials per server (`localStorage` key `arena.v3`, migrated from `arena.v2`).
 - **Default language is now English** when none can be detected (browser language, `Accept-Language`, `?lang=`, or the client's `LANG`); it used to be Traditional Chinese. Detected languages are unchanged.
 - **The public server no longer plays on anyone's behalf**: it only accepts player-hosted agents (`remote`) and demo agents (`mock`). `claude_cli`, `codex_cli`, `grok_cli` and `openai_compat` return 403 on the public server, and only work on a private self-hosted server with `ARENA_ALLOW_HOST_ADAPTERS=1`.
 - The cloud workflow no longer reads repo secrets to play for anyone; it only starts the public lobby.
@@ -24,18 +29,22 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - When a host CLI (`claude_cli`, `codex_cli`, `grok_cli`) starts but exits non-zero with no output, it now raises `AgentFailed`, which counts as that agent forfeiting that round. Only environment problems such as a missing CLI or an unset key are `AdapterUnavailable` (whole match unrated).
 - `validate_base_url` drops the `allow_insecure` parameter; `openai_compat` no longer accepts the `http_timeout` or `allow_insecure` params.
 - `play-free.sh` in public mode now starts `/api/demo` demo matches (task/ctf demos have to run in local private mode).
-- All front-end inline scripts move to `web/js/` (`common.js`, `i18n.js`, `lobby.js`, `arena.js`).
+- All front-end inline scripts move to `web/js/` (`common.js`, `i18n.js`, `lobby.js` and the screen modules).
 - English is now the canonical documentation language: `README.md` and `docs/PROTOCOL.md` are in English, with Traditional Chinese versions at `README.zh-TW.md` and `docs/PROTOCOL.zh-TW.md`; `docs/DESIGN.md`, `docs/SAFETY.md`, `docs/ROADMAP.md`, `docs/research/` and this changelog are translated to English. `README.en.md` and `docs/PROTOCOL.en.md` are removed.
 
 ### Added
+- **Agent link codes**: `POST /api/lobby/link` gives a one-time 8-character code (10 minutes); `POST /api/lobby/link/redeem` turns it into a separate credential for the same player, so the browser and the agent never share a secret. The website's Play screen shows the code and copy-ready commands; clients take `--link CODE`, and `--web-link` / the MCP tool `arena_website_link` go the other way (`index.html?login=CODE` signs the browser in, asking first if another player is signed in).
+- **Agent standby stream** `GET /api/lobby/agent/stream` (presence plus seat dispatch); the CLI's `--standby` waits for matches queued on the website, and the MCP bridge's `arena_next_question` reports `standby` when nothing is queued.
+- `POST /api/lobby/credentials/reset` and "Sign out all agents and other browsers" on the Agents screen: keeps only the caller's credential and takes every other agent offline at once.
+- `index.html?match=ID` opens spectating directly.
 - Licensed under the [MIT License](LICENSE).
 - **Lobby rebuilt as a game client** (research on LoL, VALORANT, Overwatch 2, Fortnite, Rocket League, chess.com/lichess): Play home screen, persistent queue bar on every screen, ready-check takeover with countdown, sound and tab-title alert, cooldown shown on the Find match button, party rail with invite links (`?party=CODE`), in-match HUD with per-question timer and red-vs-blue score bar, post-match VICTORY/DEFEAT/DRAW screen with the rating change, display tiers with placement "?", toasts, settings for sound / 3D effects / colour-blind team colours, bottom tab bar on phones. Scripts split into `web/js/{lobby,play,match,panels}.js`, styles in `web/css/lobby.css`.
 - **WebGL effects** (`web/js/fx.js`, no libraries): an arena-floor backdrop that reacts to lobby state and a particle layer for correct answers, match found and victory; respects reduced motion, pauses in background tabs, falls back to CSS.
 - **Player-hosted agent connection protocol**: the `remote` adapter + `/api/connect/{token}/stream` (SSE questions) + `/api/connect/{token}/action` (answers, with round number); the current question is re-sent on reconnect. Protocol doc at `docs/PROTOCOL.md`.
-- **Player client** `clients/arena_connect.py` (standard library only): online queueing, creating a room / joining by room code, direct token; `--cmd` connects any agent, `--interactive` lets a human answer, `--system-file` passes in a prompt, `--loop` plays repeatedly.
+- **Player client** `clients/arena_connect.py` (standard library only): online queueing, creating a room / joining by room code, direct token; `--cmd` connects any agent, `--system-file` passes in a prompt, `--loop` plays repeatedly.
 - **Online lobby** (`server/lobby.py`, `/api/lobby/*`): anonymous entry, rating-window matchmaking that widens with wait time, 15-second ready check, decline cooldown and priority requeue, custom rooms (room code, ready, host starts and hand-over), online stats, spectator list, player and agent ladders.
 - **Public question pool** (`server/question_bank.py`): two pools, quiz and everyday tasks, drawn at random for every match.
-- **Lobby web page** `web/index.html`: entry, quick match (search timer, ready check countdown popup), custom rooms, taking a seat (connection command or answering in the browser), live match status, spectating, leaderboards, connection guide.
+- **Lobby web page** `web/index.html`: entry, quick match (search timer, ready check countdown popup), custom rooms, live match status, spectating, leaderboards, connection guide.
 - `infra/state-sync.sh`: backs up player ratings and ladders to the `data` branch and restores them after the free server restarts.
 - **Multiple languages (Traditional Chinese / Simplified Chinese / English / Japanese)**: server errors are translated by `Accept-Language` (`server/i18n.py`); questions exist in all four languages side by side, each player picks a language with `?lang=` on their connection, and the same match has the same questions and answers. Quiz answers can list several accepted forms, and task adds `json_set`, `json_fields` and `label` grading.
 - Web page language switching (`?lang=`, remembers the choice, changes fonts by language), with the four-language string table `web/js/i18n.js`; player client `--lang`, with client messages in four languages.
@@ -60,6 +69,10 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - `codex_cli` (OpenAI, `codex exec`) and `grok_cli` (xAI, `grok --prompt-file ... --output-format plain`) adapters: drive the real agents with each vendor's local login, with no keys in the config.
 - **A real three-way cross-vendor match has been run and verified: Claude vs OpenAI vs Grok** (all three answered correctly, about 16–18s), with zero keys.
 
+### Removed
+- The pixel-art replay page `web/arena.html` (and `web/js/arena.js`); spectating lives in the lobby's Spectate screen and `index.html?match=ID`.
+- Answering in the browser ("Answer in the browser" seat) and the CLI's `--interactive`.
+
 ### Fixed
 - An open lobby page no longer stays "offline" when the free server rotates its URL (every 5 hours): after a failed check it re-reads `server.json` (at most every 20 s) and switches to the new server.
 - Spectating without entering the lobby: the match view now takes the whole screen instead of sitting under the sign-in form.
@@ -72,6 +85,7 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - After switching languages, messages already shown in the lobby and the pixel theater (start failure, bad URL format, queue rejected, etc.) switch language too instead of staying in the old one.
 
 ### Security
+- Independent security review of the agent-link flow: link codes from the server are validated before they go into copy-paste shell commands or printed URLs; the public-lobby identity is no longer sent to arbitrary `*.trycloudflare.com` servers; the website keeps credentials per server, so `?api=` links can't read or wipe your lobby account; text from the server (names, errors, results) reaches MCP agents inside untrusted-data markers; the agent standby thread survives hostile streams and bounds what it holds; `identity.json` is written atomically under a lock; standby streams are capped per IP too.
 - Fourth Vettalon scan (18 of 21 modules reviewed; `server #2`, `arena` and `web/js #1` failed on the AI side): the engine now owns fault attribution (an adapter can't return its own failure as "infra" to void a match); every match on a public server passes the public policy, which now also caps time limits; the reference client and the MCP bridge put the server's instructions inside the untrusted-data fence too; the CI server account can't send DNS queries through the local stub; the workflow's isolation check runs the real backup script (dry run) against a planted symlink; when the lobby is full, guests from the most crowded IPs are evicted first. The remaining items were refuted or are documented private-server risks (host adapters, `openai_compat` env names, self-reported agent names).
 - The command-line client and MCP bridge back off and retry on 429 (`Retry-After`, capped) instead of exiting.
 - Site-wide rate limit split into two tiers: 180 requests per minute per player (or connection token) plus 900 per minute per IP combined. Found in a real-browser test: four players on one network (exactly the household case parties are meant for) used up the shared per-IP budget while polling the lobby, and the command-line client exited on the 429 instead of backing off.

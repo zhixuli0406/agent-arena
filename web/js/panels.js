@@ -3,7 +3,6 @@
 "use strict";
 const L = window.LOBBY;
 const { S, t, th, fmtNum, $, node, ava, emptyNote, modeName, statusLabel, badgeClass, api, base, enc, tk, say, toast, copy } = L;
-const { sq } = window.ARENA;
 const { fmtTime } = window.I18N;
 const ROOM_SIZES = [2, 3, 4, 6, 8];
 const MODES = ["quiz", "task"];
@@ -107,12 +106,13 @@ function renderRoom(r) {
   const isHost = r.host === S.pid, me = r.members.find(m => m.id === S.pid);
   renderSlots(r, isHost);
   $("btnStart").classList.toggle("hide", !isHost || r.status !== "open"); $("btnReady").classList.toggle("hide", isHost || r.status !== "open");
-  $("btnReady").textContent = me && me.ready ? t("btn_unready") : t("btn_ready");
+  $("btnReady").textContent = me && me.ready ? t("btn_unready") : (S.agentOnline ? t("btn_ready") : t("btn_need_agent"));
+  $("btnReady").disabled = !S.agentOnline && !(me && me.ready);           // readying up needs your own agent online
   const allReady = r.members.length >= 2 && r.members.every(m => m.ready); $("btnStart").disabled = !allReady;
   const st = $("rStatus");
   if (r.status === "started") {
     st.className = "badge COMPLETE"; st.textContent = t("r_started"); clearInterval(rPoll);
-    if (r.token && S.token !== r.token) L.seat(r.token, r.match_id, r.members.map(m => ({ id: m.name, sub: m.agent })), ranked);
+    if (r.match_id && S.match !== r.match_id) L.seat(r.match_id, r.members.map(m => ({ id: m.name, sub: m.agent })), ranked);
   } else { st.className = "badge RUNNING"; st.textContent = allReady ? t("r_allready") : t("r_waiting"); }
 }
 
@@ -172,36 +172,12 @@ async function loadRank() {
   } catch (e) { $("rkPlayers").replaceChildren(emptyNote(e.message)); }
 }
 
-/* ---------- connect your agent ---------- */
-const queueCmd = () => L.clientCmd(["--name", sq(t("cmd_name")), "--agent", sq(t("cmd_agent")), "--mode", "quiz"]);
-// MCP bridge args. The public lobby's URL rotates (free tunnel), so the bridge finds it itself via server.json.
-function mcpArgs() {
-  let host = ""; try { host = new URL(base()).hostname; } catch (_) { /* keep empty */ }
-  const server = host.endsWith(".trycloudflare.com") ? [] : ["--server", sq(base())];
-  return ["python", "arena_mcp.py", ...server, "--name", sq(t("cmd_name")), "--agent", sq(t("cmd_agent")), "--lang", window.I18N.lang()].join(" ");
-}
-function renderCmds() {
-  L.fillCmd("cmdQueue", queueCmd);
-  L.fillCmd("cmdMcpClaude", () => "claude mcp add arena -- " + mcpArgs());
-  L.fillCmd("cmdMcpCodex", () => "codex mcp add arena -- " + mcpArgs());
-  const more = $("cMore");
-  const parts = th("c_more").split("{link}");
-  more.innerHTML = parts[0];                       // trusted template from STR
-  const a = node("a", null, "PROTOCOL.md");
-  a.href = "https://github.com/zhixuli0406/agent-arena/blob/main/docs/PROTOCOL.md"; a.target = "_blank"; a.rel = "noopener noreferrer";
-  more.appendChild(a);
-  if (parts[1]) more.insertAdjacentHTML("beforeend", parts[1]);
-}
-document.querySelectorAll("#cTabs button").forEach(b => b.addEventListener("click", () => {
-  document.querySelectorAll("#cTabs button").forEach(x => x.classList.toggle("on", x === b));
-  $("c-mcp").classList.toggle("hide", b.dataset.c !== "mcp"); $("c-cli").classList.toggle("hide", b.dataset.c !== "cli");
-}));
-
 /* ---------- hooks ---------- */
 L.hooks.init.push(renderRoomSetup);
-L.hooks.tab.push(tab => { if (tab === "watch") loadMatches(); if (tab === "rank") loadRank(); if (tab === "connect") renderCmds(); });
+L.hooks.tab.push(tab => { if (tab === "watch") loadMatches(); if (tab === "rank") loadRank(); });
+L.hooks.agent.push(() => { if (S.roomView) renderRoom(S.roomView); });
 L.hooks.lang.push(() => {
-  renderRoomSetup(); renderCmds();
+  renderRoomSetup();
   if (S.roomView) renderRoom(S.roomView);
   if (L.currentTab() === "watch" && !L.isMatchView()) loadMatches();
   if (L.currentTab() === "rank" && !L.isMatchView()) loadRank();
