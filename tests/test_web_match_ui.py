@@ -34,6 +34,9 @@ def test_live_player_count_stays_visible_on_narrow_screens():
     assert 'class="pill online-pill"' in html
     assert 'id="onlinePill"' in html and 'aria-live="polite"' in html
     assert 'id="onlineDot"' in html and 'class="online-label"' in html
+    assert 'href="css/lobby.css?v=20261024.1"' in html
+    assert 'src="js/i18n.js?v=20261024.1"' in html
+    assert 'src="js/lobby.js?v=20261024.1"' in html
     assert 'value !== null && Number.isFinite(n)' in js
     assert 'const next = ok ? fmtNum(count) : "–"' in js
     assert 'if ($("stOnline").textContent !== next)' in js
