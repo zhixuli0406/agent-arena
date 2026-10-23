@@ -11,6 +11,7 @@ All notable changes to this project are recorded in this file. The format follow
 
 ### Documentation
 
+- MCP setup is now one package install plus one client-specific command instead of three manually downloaded Python files. The website and both READMEs use the same `outprompt-mcp` / `outprompt-connect` entry points and explicitly require a restarted agent session plus a successful `arena_status` / green website state before claiming the agent is connected.
 - Repository copy now positions Outprompt around player-owned, player-tuned agents rather than the generic "AI arena" category. The English and Traditional Chinese READMEs surface multiplayer, zero-key-custody, cross-mode and spectator differentiators up front; package metadata and the GitHub About fields point to the stable public lobby.
 - `docs/ROADMAP.md` is reconciled with the deployed public alpha: matchmaking, rooms, parties, teams, spectator strategy captions and the WebGL result ceremony are marked complete, while replay, seasons, tournaments and deeper reviewed CTF isolation remain future work.
 

@@ -29,6 +29,8 @@ server = ["fastapi>=0.115", "uvicorn>=0.30"]
 
 [project.scripts]
 arena = "arena.run:main"
+outprompt-mcp = "clients.arena_mcp:main"
+outprompt-connect = "clients.arena_connect:main"
 
 [tool.setuptools.packages.find]
 include = ["arena*", "server*", "clients*"]

@@ -35,10 +35,27 @@ def test_live_player_count_stays_visible_on_narrow_screens():
     assert 'id="onlinePill"' in html and 'aria-live="polite"' in html
     assert 'id="onlineDot"' in html and 'class="online-label"' in html
     assert 'href="css/lobby.css?v=20261024.1"' in html
-    assert 'src="js/i18n.js?v=20261024.1"' in html
+    assert 'src="js/i18n.js?v=20261024.2"' in html
+    assert 'src="js/agent.js?v=20261024.2"' in html
     assert 'src="js/lobby.js?v=20261024.1"' in html
     assert 'value !== null && Number.isFinite(n)' in js
     assert 'const next = ok ? fmtNum(count) : "–"' in js
     assert 'if ($("stOnline").textContent !== next)' in js
     assert '.online-pill .online-label{display:none}' in css
     assert '.pill.opt,.me .sub' not in css
+
+
+def test_agent_setup_uses_installed_commands_and_explains_live_verification():
+    agent = (ROOT / "web/js/agent.js").read_text(encoding="utf-8")
+    i18n = (ROOT / "web/js/i18n.js").read_text(encoding="utf-8")
+    project = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert 'outprompt-mcp = "clients.arena_mcp:main"' in project
+    assert 'outprompt-connect = "clients.arena_connect:main"' in project
+    assert "archive/refs/heads/main.zip" in agent
+    assert 'claude mcp add --scope user outprompt --' in agent
+    assert 'codex mcp add outprompt --' in agent
+    assert "arena_mcp.py" not in agent
+    assert "arena_connect.py" not in agent
+    assert "ag_verify" in agent
+    assert "arena_status" in i18n

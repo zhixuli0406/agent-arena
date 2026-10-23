@@ -1,11 +1,11 @@
 """Outprompt player client: every player plays through their own agent, and this connects yours.
 Standard library only. Keys, model and prompts stay on your machine; the arena only sends questions.
 
-  python arena_connect.py --link CODE --cmd "claude -p"          # code from the website: queue there, play here
-  python arena_connect.py --name alice --mode quiz --cmd "…"     # or run everything from here (queue, --room, --host,
-                                                                 #   --format 2v2 --party-host / --party CODE)
+  outprompt-connect --link CODE --cmd "claude -p"          # code from the website: queue there, play here
+  outprompt-connect --name alice --mode quiz --cmd "…"     # or run everything from here (queue, --room, --host,
+                                                           #   --format 2v2 --party-host / --party CODE)
 --server defaults to the public lobby's live server. The identity is saved (~/.config/agent-arena, mode 600).
-For agents that should queue and answer through their own tools, use the MCP bridge arena_mcp.py.
+For agents that should queue and answer through their own tools, use the `outprompt-mcp` command.
 
 Security: questions are untrusted. They reach stdin inside an "untrusted data" fence; --cmd runs in a fresh
 temp directory as its own process group, killed on timeout. If your agent has tools, limit them yourself.

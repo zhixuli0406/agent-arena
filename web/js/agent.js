@@ -6,8 +6,8 @@
 const L = window.LOBBY;
 const { S, t, th, $, node, api, base, toast } = L;
 const { sq } = window.ARENA;
-const FILES = ["arena_mcp.py", "arena_connect.py", "arena_messages.py"];
-const REPO = "https://github.com/zhixuli0406/agent-arena/blob/main/clients/";
+const PACKAGE = "https://github.com/zhixuli0406/agent-arena/archive/refs/heads/main.zip";
+const BIN = '"$HOME/.local/share/outprompt/bin/';
 let link = null, ticker = 0;            // { code, until }
 
 function serverArgs() {
@@ -18,11 +18,14 @@ function commands() {
   // link.code was checked against [A-Z0-9] in getCode(), so it is safe unquoted in a shell command
   const who = link ? ["--link", link.code] : ["--name", sq(t("cmd_name")), "--agent", sq(t("cmd_agent"))];
   const lang = ["--lang", window.I18N.lang()];
-  const mcp = ["python", "arena_mcp.py", ...serverArgs(), ...who, ...lang].join(" ");
+  const install = ['python3 -m venv "$HOME/.local/share/outprompt"',
+    BIN + 'python" -m pip install --upgrade ' + sq(PACKAGE)].join(" && ");
+  const mcp = [BIN + 'outprompt-mcp"', ...serverArgs(), ...who, ...lang].join(" ");
   return {
-    claude: "claude mcp add arena -- " + mcp,
-    codex: "codex mcp add arena -- " + mcp,
-    cli: ["python", "arena_connect.py", ...serverArgs(), ...who, ...lang, "--cmd", sq("claude -p")].join(" "),
+    install,
+    claude: "claude mcp add --scope user outprompt -- " + mcp,
+    codex: "codex mcp add outprompt -- " + mcp,
+    cli: [BIN + 'outprompt-connect"', ...serverArgs(), ...who, ...lang, "--cmd", sq("claude -p")].join(" "),
   };
 }
 async function getCode() {
@@ -51,14 +54,17 @@ function step(label, html, cmd) {
   if (cmd) d.appendChild(cmdBox(cmd));
   li.appendChild(d); return li;
 }
-function files() {
-  const d = node("div", "help");
-  d.append(document.createTextNode(t("ag_files") + " "));
-  FILES.forEach((f, i) => {
-    const a = node("a", null, f); a.href = REPO + f; a.target = "_blank"; a.rel = "noopener noreferrer";
-    d.append(a); if (i < FILES.length - 1) d.append(" · ");
+function choices(c) {
+  const li = node("li"), d = node("div");
+  d.appendChild(node("div", null, t("ag_choose")));
+  [["ag_mcp_claude", false, c.claude], ["ag_mcp_codex", false, c.codex],
+    ["ag_mcp_other", true, null], ["ag_cli", false, c.cli]].forEach(([label, html, cmd]) => {
+    const item = node("div", "help");
+    if (html) item.innerHTML = th(label); else item.textContent = t(label);
+    if (cmd) item.appendChild(cmdBox(cmd));
+    d.appendChild(item);
   });
-  return d;
+  li.appendChild(d); return li;
 }
 function renderInto(box, big) {
   if (!box) return;
@@ -85,9 +91,8 @@ function renderInto(box, big) {
   }
   if (signedIn && !link) return;                             // commands only make sense with a code (or for agent-first)
   const c = commands(), ol = node("ol", "steps");
-  ol.append(step("ag_mcp_claude", false, c.claude), step("ag_mcp_codex", true, c.codex), step("ag_mcp_other", true),
-    step("ag_cli", false, c.cli));
-  box.append(files(), ol);
+  ol.append(step("ag_install", false, c.install), choices(c), step("ag_verify", false));
+  box.appendChild(ol);
   if (signedIn && !on) box.appendChild(node("p", "note waiting", t("ag_wait")));
 }
 function renderReset(box) {
