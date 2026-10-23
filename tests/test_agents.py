@@ -109,11 +109,14 @@ def test_seats_go_to_the_agent_stream_not_the_lobby_views(monkeypatch):
         assert v["status"] == "confirmed" and "token" not in v
         # the agent's standby stream delivers the seat
         with c.stream("GET", "/api/lobby/agent/stream", headers=hdr(a)) as s:
+            assert s.headers["cache-control"] == "no-cache, no-transform"
+            assert s.headers["x-accel-buffering"] == "no"
             lines = []
             for line in s.iter_lines():
                 lines.append(line)
                 if line.startswith("data:") and "token" in line:
                     break
+        assert any(line.startswith(":") and len(line) >= 4097 for line in lines)
         assert any(l.startswith("event: hello") for l in lines) and any(l.startswith("event: match") for l in lines)
         item = json.loads([l for l in lines if l.startswith("data:") and "token" in l][0][5:])
         assert item["match_id"] == v["match_id"] and item["token"] and "_id" not in item

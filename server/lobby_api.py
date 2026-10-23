@@ -21,6 +21,7 @@ from .lobby import FORMATS, MODES, ROOM_CODE_LEN, SIZES, TEAM_FORMATS, Player, _
 from .party import PARTY_MAX, PARTY_SPREAD
 
 router = APIRouter(prefix="/api/lobby", tags=["lobby"])
+SSE_PROXY_PADDING = 4096
 
 
 def _me(request: Request, pid: str | None, secret: str | None) -> Player:
@@ -117,6 +118,9 @@ async def agent_stream(request: Request, x_player_id: str | None = Header(None),
     async def gen():
         rt.hub.connect(pid, cred)
         try:
+            # Some reverse proxies buffer tiny quiet SSE responses. A valid comment larger than the common
+            # proxy threshold makes the hello and later seat dispatch visible immediately.
+            yield ":" + (" " * SSE_PROXY_PADDING) + "\n\n"
             yield f"event: hello\ndata: {json.dumps({'player': rt.lobby.public(p)}, ensure_ascii=False)}\n\n"
             seen = 0
             while rt.lobby.has_credential(pid, cred):        # signed out ("sign out all agents" / evicted): stop dispatching
@@ -134,7 +138,11 @@ async def agent_stream(request: Request, x_player_id: str | None = Header(None),
             guard.streams.release(key)
             guard.streams.release(ip_key)
 
-    return StreamingResponse(gen(), media_type="text/event-stream")
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+    )
 
 
 # ---------------- Matchmaking ----------------

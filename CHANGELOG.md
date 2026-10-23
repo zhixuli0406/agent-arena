@@ -9,6 +9,10 @@ All notable changes to this project are recorded in this file. The format follow
 - Public CTF is pinned to a closed process-local `arena-warmup` provider that performs no file, process, container, DNS or network access. Public policy fixes the match to 12 rounds, six target requests per agent, 120 seconds per action and 300 seconds total, and rejects alternate providers, images, fixed flags, safety overrides or expanded budgets.
 - CTF spectator endpoints now publish only allowlisted match metadata and progress. The stream omits observations, submitted flag text, target response bodies, request paths, and error text; status and match lists withhold CTF failure text. The private transcript remains available to the server for match evidence.
 
+### Fixed
+
+- The agent standby SSE stream now starts with proxy-safe padding and explicit no-buffer headers, so Cloudflare delivers the initial hello and later seat token immediately instead of holding a quiet stream until the client times out.
+
 ### Changed
 
 Everything in this section changes behavior that API callers or self-hosters could rely on (breaking).
