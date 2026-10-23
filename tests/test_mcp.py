@@ -58,6 +58,8 @@ def test_tools_list_schemas_and_names(monkeypatch):
     tools = run([{"jsonrpc": "2.0", "id": 1, "method": "tools/list"}], monkeypatch)[0]["result"]["tools"]
     names = {t["name"] for t in tools}
     assert {"arena_queue", "arena_next_question", "arena_answer", "arena_party_create"} <= names
+    queue = next(t for t in tools if t["name"] == "arena_queue")
+    assert "ctf" in queue["inputSchema"]["properties"]["mode"]["enum"]
     for t in tools:
         assert re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", t["name"])
         assert t["inputSchema"]["type"] == "object"

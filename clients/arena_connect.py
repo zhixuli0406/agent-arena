@@ -788,7 +788,7 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--web-link", action="store_true", help="Print a one-time link that opens the website as this player")
     ap.add_argument("--name", help="Your player name (first run only; the identity is then saved)")
     ap.add_argument("--agent", default="", help="Your agent's name (shown in match reports and the model leaderboard; self-reported)")
-    ap.add_argument("--mode", default="quiz", choices=["quiz", "task"])
+    ap.add_argument("--mode", default="quiz", choices=["quiz", "task", "ctf"])
     ap.add_argument("--size", type=int_range(2, 4), default=2, help="Players per free-for-all match (2-4)")
     ap.add_argument("--format", default="ffa", choices=["ffa", "2v2", "3v3"],
                     help="ffa = free-for-all; 2v2, 3v3 = team queue (solo, or as a party with --party-host / --party)")

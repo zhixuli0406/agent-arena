@@ -5,7 +5,7 @@ const L = window.LOBBY;
 const { S, t, th, fmtNum, $, node, ava, emptyNote, modeName, statusLabel, badgeClass, api, base, enc, tk, say, toast, copy } = L;
 const { fmtTime } = window.I18N;
 const ROOM_SIZES = [2, 3, 4, 6, 8];
-const MODES = ["quiz", "task"];
+const MODES = ["quiz", "task", "ctf"];
 
 /* ---------- custom rooms (unranked) ---------- */
 let rPoll = null, rPause = 0;

@@ -15,6 +15,7 @@ from server import runtime as rt
 from server.app import _obs_payload, app
 from server.agents import AgentHub
 from server.lobby import Lobby
+from server.question_bank import PUBLIC_CTF_CONFIG
 
 
 @pytest.fixture(autouse=True)
@@ -46,9 +47,46 @@ def test_public_policy_rejects_host_adapters_and_translates():
     with pytest.raises(rt.PolicyError) as e:
         rt.check_public(cfg)
     assert e.value.code == 403 and "claude_cli" in e.value.text("en") and "Public servers" in e.value.text("en")
-    ctf = MatchConfig.from_dict({"mode": "ctf", "agents": [{"id": "a", "adapter": "mock"}]})
-    with pytest.raises(rt.PolicyError):
-        rt.check_public(ctf)
+    ctf = MatchConfig.from_dict({
+        "mode": "ctf", "mode_config": dict(PUBLIC_CTF_CONFIG),
+        "agents": [{"id": "a", "adapter": "mock"}],
+        "max_rounds": 12, "timeout_seconds": 120, "max_wall_seconds": 300,
+    })
+    rt.check_public(ctf)
+
+
+@pytest.mark.parametrize("unsafe", [
+    {"provider": "local", "target": "arena-warmup"},
+    {"provider": "cloudrun", "target": "arena-warmup"},
+    {"provider": "builtin", "target": "bkimminich/juice-shop"},
+    {**PUBLIC_CTF_CONFIG, "flag": "FLAG{fixed}"},
+    {**PUBLIC_CTF_CONFIG, "allow_host_agentic": True},
+    {**PUBLIC_CTF_CONFIG, "max_requests_per_agent": 100},
+])
+def test_public_policy_rejects_unsafe_ctf_configuration(unsafe):
+    cfg = MatchConfig.from_dict({
+        "mode": "ctf", "mode_config": unsafe,
+        "agents": [{"id": "a", "adapter": "mock"}],
+    })
+    with pytest.raises(rt.PolicyError) as exc:
+        rt.check_public(cfg)
+    assert exc.value.key == "policy_ctf"
+
+
+@pytest.mark.parametrize("unsafe_limit", [
+    {"max_rounds": 13, "timeout_seconds": 120, "max_wall_seconds": 300},
+    {"max_rounds": 12, "timeout_seconds": 121, "max_wall_seconds": 300},
+    {"max_rounds": 12, "timeout_seconds": 120, "max_wall_seconds": 301},
+])
+def test_public_policy_rejects_expanded_ctf_runtime_limits(unsafe_limit):
+    cfg = MatchConfig.from_dict({
+        "mode": "ctf", "mode_config": dict(PUBLIC_CTF_CONFIG),
+        "agents": [{"id": "a", "adapter": "mock"}],
+        **unsafe_limit,
+    })
+    with pytest.raises(rt.PolicyError) as exc:
+        rt.check_public(cfg)
+    assert exc.value.key == "policy_ctf"
 
 
 def test_custom_matches_closed_on_public_server():
@@ -87,6 +125,16 @@ def test_queue_flow_and_auth():
         r = c.post(f"/api/lobby/tickets/{t['ticket_id']}/cancel", headers=hdr(a)).json()
         assert r["status"] == "cancelled"
         assert c.post("/api/lobby/queue", json={"mode": "quiz", "size": "x"}, headers=hdr(a)).status_code == 400
+
+
+def test_public_ctf_is_available_in_queue_and_custom_rooms():
+    with TestClient(app) as c:
+        player = reg(c, "CTF Player")
+        ticket = c.post("/api/lobby/queue", json={"mode": "ctf", "size": 2}, headers=hdr(player))
+        assert ticket.status_code == 200 and ticket.json()["mode"] == "ctf"
+        c.post(f"/api/lobby/tickets/{ticket.json()['ticket_id']}/cancel", headers=hdr(player))
+        room = c.post("/api/lobby/rooms", json={"mode": "ctf", "size": 2}, headers=hdr(player))
+        assert room.status_code == 200 and room.json()["mode"] == "ctf"
 
 
 def test_room_flow_members_only_kick_and_language():
@@ -273,6 +321,20 @@ def test_lobby_wall_clock_exceeds_items_times_timeout(monkeypatch):
         cfg = seen["cfg"]
         n = len(cfg.mode_config.get("questions") or cfg.mode_config.get("tasks"))
         assert cfg.max_wall_seconds > n * cfg.timeout_seconds    # stalling every question can't exhaust the wall clock, so the match can't be forced unrated
+
+
+def test_public_ctf_lobby_uses_the_fixed_safe_target(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(rt, "start_match", lambda cfg, **kw: seen.setdefault("cfg", cfg) and "mid")
+    a, b = rt.lobby.register("A"), rt.lobby.register("B")
+
+    rt._lobby_start("ctf", [a, b], ranked=False)
+
+    cfg = seen["cfg"]
+    assert cfg.mode_config == PUBLIC_CTF_CONFIG
+    assert "flag" not in cfg.mode_config
+    assert (cfg.max_rounds, cfg.timeout_seconds, cfg.max_wall_seconds) == (12, 120, 300)
+    rt.check_public(cfg)
 
 
 def test_party_team_queue_over_http(monkeypatch):

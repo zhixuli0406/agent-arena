@@ -3,7 +3,11 @@
 "use strict";
 const L = window.LOBBY;
 const { S, t, th, fmtNum, $, node, ava, mmss, modeName, api, enc, tk, say, toast, copy } = L;
-const MODES = { quiz: ["m_quiz", "m_quiz_d", "?"], task: ["m_task", "m_task_d", "{}"] };
+const MODES = {
+  quiz: ["m_quiz", "m_quiz_d", "?"],
+  task: ["m_task", "m_task_d", "{}"],
+  ctf: ["m_ctf", "m_ctf_d", "⚑"],
+};
 const SIZES = { 2: "s_2", 3: "s_3", 4: "s_4" };
 const FORMATS = { ffa: ["f_ffa", "f_ffa_d"], "2v2": ["f_2v2", "f_2v2_d"], "3v3": ["f_3v3", "f_3v3_d"] };
 const inParty = () => !!(S.party && S.party.members && S.party.members.length > 1);

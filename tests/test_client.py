@@ -11,6 +11,10 @@ import pytest
 
 from clients import arena_connect as ac
 
+
+def test_cli_accepts_public_ctf_mode():
+    assert ac.parse_args(["--mode", "ctf", "--cmd", "agent", "--lang", "en"]).mode == "ctf"
+
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="process group tests run only on POSIX")
 
 

@@ -6,6 +6,7 @@ All notable changes to this project are recorded in this file. The format follow
 
 ### Security
 
+- Public CTF is pinned to a closed process-local `arena-warmup` provider that performs no file, process, container, DNS or network access. Public policy fixes the match to 12 rounds, six target requests per agent, 120 seconds per action and 300 seconds total, and rejects alternate providers, images, fixed flags, safety overrides or expanded budgets.
 - CTF spectator endpoints now publish only allowlisted match metadata and progress. The stream omits observations, submitted flag text, target response bodies, request paths, and error text; status and match lists withhold CTF failure text. The private transcript remains available to the server for match evidence.
 
 ### Changed
@@ -33,7 +34,7 @@ Everything in this section changes behavior that API callers or self-hosters cou
 - A single agent timing out or erroring changes from "whole match DEGRADED, unrated" to "that round forfeited, match COMPLETE and rated as usual"; 3 failed rounds in a row means withdrawal.
 - When a host CLI (`claude_cli`, `codex_cli`, `grok_cli`) starts but exits non-zero with no output, it now raises `AgentFailed`, which counts as that agent forfeiting that round. Only environment problems such as a missing CLI or an unset key are `AdapterUnavailable` (whole match unrated).
 - `validate_base_url` drops the `allow_insecure` parameter; `openai_compat` no longer accepts the `http_timeout` or `allow_insecure` params.
-- `play-free.sh` in public mode now starts `/api/demo` demo matches (task/ctf demos have to run in local private mode).
+- `play-free.sh` in public mode starts `/api/demo` quiz matches. CTF is available through public matchmaking and rooms with the fixed built-in warmup target; arbitrary CTF targets remain private-only.
 - All front-end inline scripts move to `web/js/` (`common.js`, `i18n.js`, `lobby.js` and the screen modules).
 - English is now the canonical documentation language: `README.md` and `docs/PROTOCOL.md` are in English, with Traditional Chinese versions at `README.zh-TW.md` and `docs/PROTOCOL.zh-TW.md`; `docs/DESIGN.md`, `docs/SAFETY.md`, `docs/ROADMAP.md`, `docs/research/` and this changelog are translated to English. `README.en.md` and `docs/PROTOCOL.en.md` are removed.
 

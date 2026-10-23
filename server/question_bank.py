@@ -12,6 +12,14 @@ from typing import Any, Callable
 
 LANGS = ("zh-TW", "zh-CN", "en", "ja")
 
+PUBLIC_CTF_CONFIG: dict[str, Any] = {
+    "provider": "builtin",
+    "target": "arena-warmup",
+    "first_blood": True,
+    "max_requests_per_agent": 6,
+    "ttl_seconds": 300,
+}
+
 
 def L(tw: str, cn: str, en: str, ja: str) -> dict[str, str]:
     return {"zh-TW": tw, "zh-CN": cn, "en": en, "ja": ja}
@@ -228,6 +236,8 @@ TASK_GENERATORS: list[Gen] = [t_emails, t_order, t_date, t_person, t_sentiment, 
 def pick(mode: str, n: int | None = None, rng: random.Random | None = None) -> dict[str, Any]:
     """Build the mode_config for one match (parameters differ every match)."""
     rng = rng or random.Random()
+    if mode == "ctf":
+        return dict(PUBLIC_CTF_CONFIG)
     if mode == "task":
         gens = rng.sample(TASK_GENERATORS, k=min(n or 3, len(TASK_GENERATORS)))
         return {"tasks": [{"id": f"t{i + 1}", **g(rng)} for i, g in enumerate(gens)]}

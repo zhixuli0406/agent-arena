@@ -4,7 +4,7 @@ The security matches in this project make sense in one situation only: **authori
 
 Read this document before working on the security arena (`ctf` mode). The rules are written as hard gates: the code enforces them, they don't depend on self-discipline.
 
-## Implementation status (2026-10-22)
+## Implementation status (2026-10-23)
 
 | Gate | Status | Where |
 |---|---|---|
@@ -16,7 +16,8 @@ Read this document before working on the security arena (`ctf` mode). The rules 
 | G6 permission boundary | ✅ Enforced | `cloudrun` raises PermissionError on IAM_PERMISSION_DENIED, stops and reports |
 | Cloud Run egress | ⚠️ Not controlled | So `cloudrun` v0 only accepts self-hosted self (inert) targets; OSS targets wait for VPC egress control |
 | C1 no host-side agentic agents | ✅ Enforced | `ctf` setup checks `is_host_actor`; can be explicitly allowed with `allow_host_agentic` |
-| CTF spectator flag secrecy | ✅ Enforced locally | The stream emits an allowlisted `ctf` projection; match status and lobby match lists withhold CTF failure text. The private transcript retains match evidence. This does not enable CTF on the public server. |
+| P1 public CTF closed configuration | ✅ Enforced | Public policy accepts only `builtin` + `arena-warmup`, first blood, 12 rounds, six target requests per agent, 120 seconds per action, 300 seconds total and no supplied flag or override |
+| CTF spectator flag secrecy | ✅ Enforced | The stream emits an allowlisted `ctf` projection; match status and lobby match lists withhold CTF failure text. The private transcript retains match evidence. |
 
 ## Threat model: who we defend against
 
@@ -30,11 +31,11 @@ Read this document before working on the security arena (`ctf` mode). The rules 
 
 ### G1 target allowlist
 
-Only targets on the **allowlist of known-vulnerable images** (`targets/allowlist.yaml`) can be started: OWASP Juice Shop, DVWA, WebGoat, and the CTF containers that ship in this project's `targets/`. Any image not on the allowlist is refused. This rules out "just go hit a real service while you're at it".
+The public server accepts only the built-in `arena-warmup` target. It is implemented from fixed response templates in the server process and is not a URL or executable target. Private Docker matches can start only targets on the **allowlist of known-vulnerable images** (`targets/allowlist.yaml`): OWASP Juice Shop, DVWA, WebGoat, and the CTF containers that ship in this project's `targets/`. Any other target is refused. This rules out "just go hit a real service while you're at it".
 
 ### G2 network isolation and no egress
 
-Targets run in a separate Docker network (`local`) or a separate Cloud Run service with no outbound access (`cloudrun`). By default **targets cannot reach the outside network** (only the agent → target path is open). Agents reach targets through the engine's proxy tools and get no ability to connect directly to arbitrary networks.
+The public `builtin` target has no network implementation at all: its `http()` method maps a bounded path to fixed strings in memory. Private targets run in a separate Docker network (`local`) or a separate Cloud Run service with no outbound access (`cloudrun`). By default **targets cannot reach the outside network** (only the agent → target path is open). Agents reach targets through the engine's proxy tools and get no ability to connect directly to arbitrary networks.
 
 ### G3 TTL circuit breaker
 
@@ -54,7 +55,7 @@ The `cloudrun` provider only does deployment work (deploy, builds, source upload
 
 ## Scope
 
-- ✅ Supported: CTF on self-hosted isolated targets, red/blue team exercises, research on models' attack and defense abilities, teaching.
+- ✅ Supported: public warmup CTF on the inert built-in target; CTF on self-hosted isolated targets; red/blue team exercises; research on models' attack and defense abilities; teaching.
 - ❌ Not supported and not assisted: scanning or attacking real systems without authorization, DoS, large-scale targeting, supply chain poisoning, detection evasion for malicious purposes.
 
 If the provisioner detects that a target looks like a real or public host (an image not on the allowlist, or a non-isolated network segment), it refuses and logs it, and does not run it.

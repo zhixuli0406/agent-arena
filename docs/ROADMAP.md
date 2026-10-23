@@ -31,6 +31,7 @@ Run one quiz match end to end on the local machine.
 - [x] Provisioner `base` + `local` (Docker, runner sidecar isolation model; tested that the host is closed off and the target has no egress)
 - [x] `targets/allowlist.yaml` + the bundled `arena-warmup` target (Juice Shop/DVWA/WebGoat are allowlisted, not yet wired in)
 - [x] `ctf` mode: HTTP tools (strict GET/POST/SUBMIT grammar), constant-time check_flag, first blood, request budget
+- [x] Public CTF quick match and rooms through a closed process-local warmup target (no file, process, container, DNS or network access)
 - [x] Safety gates G1–G5 in place + tests (allowlist refusal, C1 host agent refusal, isolation, DATA fence)
 - **DoD**: ✅ local Docker starts the target, a mock attacker submits the flag through the engine tools, and teardown happens automatically at match end; the CLI match report and pytest both pass.
 - Still to do: wire in OSS targets such as Juice Shop (bigger images, slower start), and an attacker-container shell mode (more realistic than HTTP, but harder to isolate).

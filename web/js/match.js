@@ -93,7 +93,11 @@ function onEvent(ev) {
     });
     bMode = d.mode; renderMeta();
   } else if (ev.type === "teams") { bTeams = ev.data || null; renderWin(); renderResult(); }
-  else if (ev.type === "action") feed(th("f_act", { a: ev.agent }));
+  else if (ev.type === "action") { if (bMode !== "ctf") feed(th("f_act", { a: ev.agent })); }
+  else if (ev.type === "request") {
+    const d = ev.data || {}; feed(th("f_ctf_req", { a: ev.agent, m: d.method || "HTTP", s: d.status == null ? "?" : d.status }));
+  } else if (ev.type === "solve") feed(th("f_ctf_solve", { a: ev.agent }));
+  else if (ev.type === "submit_wrong") feed(th("f_ctf_wrong", { a: ev.agent }));
   else if (ev.type === "grade") {
     const d = ev.data || {}; const ok = d.correct || d.ok;
     const p = Number(d.points), pts = Number.isFinite(p) && p >= 0 && p <= 10 ? Math.round(p * 100) / 100 : 1;

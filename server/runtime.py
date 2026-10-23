@@ -25,7 +25,7 @@ from arena.types import AgentSpec, MatchConfig
 from .agents import AgentHub
 from .i18n import I18nError
 from .lobby import Lobby, Player
-from .question_bank import pick
+from .question_bank import PUBLIC_CTF_CONFIG, pick
 from .spectate import public_faults
 
 log = logging.getLogger("arena.server")
@@ -48,7 +48,10 @@ matches: dict[str, dict[str, Any]] = {}
 valid_tokens: set[str] = set()
 
 
-PUBLIC_MODES = {"quiz", "task"}
+PUBLIC_MODES = {"quiz", "task", "ctf"}
+PUBLIC_CTF_MAX_ROUNDS = 12
+PUBLIC_CTF_STEP_TIMEOUT = 120
+PUBLIC_CTF_WALL_SECONDS = 300
 MAX_MATCH_AGENTS = 8
 MAX_MATCH_ITEMS = 20
 
@@ -69,6 +72,11 @@ def check_public(cfg: MatchConfig) -> None:
         raise PolicyError("policy_adapters", bad=bad)
     if cfg.mode not in PUBLIC_MODES:
         raise PolicyError("policy_mode", mode=cfg.mode)
+    if cfg.mode == "ctf":
+        runtime_limits = (cfg.max_rounds, cfg.timeout_seconds, cfg.max_wall_seconds)
+        required_limits = (PUBLIC_CTF_MAX_ROUNDS, PUBLIC_CTF_STEP_TIMEOUT, PUBLIC_CTF_WALL_SECONDS)
+        if cfg.mode_config != PUBLIC_CTF_CONFIG or runtime_limits != required_limits:
+            raise PolicyError("policy_ctf")
     if len(cfg.agents) > MAX_MATCH_AGENTS:
         raise PolicyError("max_agents", n=MAX_MATCH_AGENTS)
     items = cfg.mode_config.get("tasks" if cfg.mode == "task" else "questions") or []
@@ -247,13 +255,15 @@ def _lobby_start(mode: str, players: list[Player], ranked: bool = True,
                        "prompt_author": p.id, "params": {"token": tok}, "team": (teams or {}).get(p.id, "")})
     mode_config = pick(mode)
     items = mode_config.get("questions") or mode_config.get("tasks") or []
+    is_ctf = mode == "ctf"
     cfg = MatchConfig.from_dict({
         "mode": mode, "mode_config": mode_config, "agents": agents,
         "ratings_path": LADDER_PATH if ranked else "",          # unrated matches never touch the ladder file
         "team_ladder": False,                                    # red/blue are random teams; no team ladder
-        "timeout_seconds": LOBBY_STEP_TIMEOUT,
+        "max_rounds": PUBLIC_CTF_MAX_ROUNDS if is_ctf else 100,
+        "timeout_seconds": PUBLIC_CTF_STEP_TIMEOUT if is_ctf else LOBBY_STEP_TIMEOUT,
         # the wall-clock cap must exceed (questions x per-question limit), or a losing player could stall every question to make the match DEGRADED and unrated
-        "max_wall_seconds": len(items) * LOBBY_STEP_TIMEOUT + 300,
+        "max_wall_seconds": PUBLIC_CTF_WALL_SECONDS if is_ctf else len(items) * LOBBY_STEP_TIMEOUT + 300,
     })
 
     def _ladder(rep: MatchReport) -> None:

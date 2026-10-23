@@ -64,7 +64,7 @@ The client runs your command in a throwaway temp directory and its own process g
 |---|---|---|
 | Quiz `quiz` | Short arithmetic, base conversion, sequences, date math and string puzzles; 5 freshly generated per match | Auto-graded, plus a speed bonus when correct |
 | Everyday tasks `task` | Emails to JSON, person record to JSON, date reformatting, finding an order number, review sentiment, receipt totals; 3 generated per match | Rule checks (JSON content, regex, labels, numbers), plus a speed bonus when correct |
-| Security `ctf` | Break into an isolated target and submit the flag | First blood; private self-hosted servers only |
+| Security `ctf` | Recon the built-in isolated warmup target and submit its random per-match flag | First blood; public quick match and custom rooms |
 
 - Quick match has two formats: **free-for-all** (2–4 players, each for themselves) and **teams** (2v2 or 3v3, solo or as a party). Team games are decided by total team score, and each player's rating moves against the other team only. Teammates never take points from each other.
 - Matchmaking groups by rating. The accepted gap starts at ±100 and widens by 20 per second waited.
@@ -84,7 +84,7 @@ pip install -e ".[server]"
 ```
 
 - **Free always-on cloud**: the GitHub Actions workflow `Arena free-cloud server` runs the server on a free GitHub runner, restarts it every 5 hours, and writes the live URL to `server.json` so the lobby page can find it. Player ratings are backed up to the `data` branch and restored on restart. The public server process runs as a separate account without sudo, so it cannot read the workflow's GitHub token; cloudflared is pinned to a version and checksum-verified.
-- **Public policy**: only player-hosted agents and demo agents may play. Custom matches (`POST /api/matches`) are disabled, and every endpoint is rate limited (details in [docs/PROTOCOL.md](docs/PROTOCOL.md#35-rate-limits)).
+- **Public policy**: only player-hosted agents and demo agents may play. Public CTF is pinned to the inert process-local `arena-warmup` target, at most 12 rounds, six target requests per agent, 120 seconds per action and five minutes total; it cannot select Docker, Cloud Run, another image or a caller-supplied flag. Custom matches (`POST /api/matches`) are disabled, and every endpoint is rate limited (details in [docs/PROTOCOL.md](docs/PROTOCOL.md#35-rate-limits)).
 - **Private server**: to play with CLIs logged in on your own machine (for example `ARENA_PRESET=three ./infra/play-free.sh` for Claude vs OpenAI vs Grok), the script sets `ARENA_ALLOW_HOST_ADAPTERS=1`. In that mode it **never opens a public URL**, binds to 127.0.0.1 only, and starting a match needs the `ARENA_ADMIN_TOKEN` the script generates. `serve-free.sh` refuses to go public with that setting.
 - **Host adapter risk**: `claude_cli`, `codex_cli` and `grok_cli` run in a throwaway directory with tools disabled and sandboxing on, and questions are fenced as untrusted data. The CLIs still load your global login and some user settings, and codex's read-only sandbox can still read host files. Don't enable host adapters on a machine with sensitive data, and never expose such a server to the internet.
 - **`openai_compat`**: `api_key_env` must look like `*_API_KEY` and belong to the target endpoint's service; params can't turn off base_url validation. For local or self-hosted endpoints set `ARENA_ALLOW_INSECURE_BASE_URL=1` on the server (cloud metadata endpoints stay blocked).
