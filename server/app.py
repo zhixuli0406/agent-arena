@@ -36,7 +36,7 @@ from arena.types import MatchConfig
 from . import guard
 from . import runtime as rt
 from .i18n import SUPPORTED, I18nError, pick_lang
-from .lobby_api import router as lobby_router
+from .lobby_api import _proxy_flushed, router as lobby_router
 from .spectate import public_ctf_event, public_faults
 
 log = logging.getLogger("arena.server")
@@ -318,16 +318,16 @@ async def connect_stream(request: Request, token: str, lang: str | None = None) 
         # State broadcast: every connection reads the same slot state, so reconnects, multiple windows or stale connections can't steal a question or the end signal
         slot.connections += 1
         try:
-            yield "event: hello\ndata: {}\n\n"
+            yield _proxy_flushed("event: hello\ndata: {}\n\n")
             seen = -1                                     # send the current state on connect (catch-up after reconnect)
             while True:
                 if slot.ended:
-                    yield "event: end\ndata: {}\n\n"
+                    yield _proxy_flushed("event: end\ndata: {}\n\n")
                     return
                 if slot.version != seen:
                     seen = slot.version
                     if slot.current is not None:
-                        yield f"data: {_obs_payload(slot.current, use_lang)}\n\n"
+                        yield _proxy_flushed(f"data: {_obs_payload(slot.current, use_lang)}\n\n")
                     continue
                 if not await slot.wait_change(seen, 15):
                     yield ": ping\n\n"                    # heartbeat so proxies/firewalls don't drop the connection
@@ -335,7 +335,11 @@ async def connect_stream(request: Request, token: str, lang: str | None = None) 
             slot.connections -= 1
             guard.streams.release("tok:" + token)
 
-    return StreamingResponse(gen(), media_type="text/event-stream")
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+    )
 
 
 ACTION_MAX_CHARS = 4000

@@ -194,6 +194,24 @@ def test_connect_action_validation():
         drop_slot(tok)
 
 
+def test_connect_stream_frames_are_proxy_flushed():
+    tok = "tk-stream-flush"
+    rt.valid_tokens.add(tok)
+    slot = get_slot(tok)
+    slot.finish()
+    try:
+        with TestClient(app) as c:
+            r = c.get(f"/api/connect/{tok}/stream")
+        comments = [line for line in r.text.splitlines() if line.startswith(":")]
+        assert r.status_code == 200
+        assert r.text.startswith("event: hello") and "event: end" in r.text
+        assert len(comments) == 512
+        assert r.headers["cache-control"] == "no-cache, no-transform"
+    finally:
+        rt.valid_tokens.discard(tok)
+        drop_slot(tok)
+
+
 def test_connect_token_is_redacted_from_security_logs(caplog):
     tok = "private-connection-token"
     path = f"/api/connect/{tok}/action"
